@@ -1,6 +1,6 @@
 # Multi-stage Dockerfile for Axiomatic
 # Stage 1: Build release binary
-FROM rust:1.77-slim as builder
+FROM rust:1.82-slim AS builder
 
 WORKDIR /usr/src/axiomatic
 COPY Cargo.toml Cargo.lock ./
