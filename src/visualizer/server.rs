@@ -4,7 +4,10 @@ use crate::nn::embedding::vectorize_proof_state;
 use crate::nn::model::{DeepNeuralPolicy, DeepProofNetwork, ModelCheckpoint};
 use crate::nn::optim::AdamOptimizer;
 use crate::nn::supervisor::{RollbackEvent, TrainingHealthStatus, TrainingSupervisor};
-use crate::nn::trainer::{collect_parallel_self_play_trajectories, convert_mcts_tree_to_training_samples, ReplayBuffer, TrainingMetrics};
+use crate::nn::trainer::{
+    collect_parallel_self_play_trajectories, convert_mcts_tree_to_training_samples, ReplayBuffer,
+    TrainingMetrics,
+};
 use crate::search::mcts::{MctsEngine, SearchEvent, SearchGraphSnapshot};
 use crate::theory::curriculum::CurriculumController;
 use crate::theory::decomposer::GoalDecomposer;
@@ -134,7 +137,12 @@ impl EngineController {
         self.axioms = AxiomLibrary::for_domain(domain);
 
         for (name, rule) in &self.axioms.rules {
-            if !self.vectordb.records.iter().any(|r| r.payload.name == *name) {
+            if !self
+                .vectordb
+                .records
+                .iter()
+                .any(|r| r.payload.name == *name)
+            {
                 let state = ProofState::new(rule.clone());
                 let vec = vectorize_proof_state(&state);
                 self.vectordb.insert(
@@ -191,7 +199,11 @@ impl EngineController {
     }
 
     /// Probes the designated target goal with the latest neural weights
-    pub fn probe_target_goal(&mut self, epoch_num: usize, budget: usize) -> Option<TargetProbeResult> {
+    pub fn probe_target_goal(
+        &mut self,
+        epoch_num: usize,
+        budget: usize,
+    ) -> Option<TargetProbeResult> {
         let target = self.target_goal.as_ref()?.clone();
         let policy = DeepNeuralPolicy::new(self.model.clone());
 
@@ -208,7 +220,8 @@ impl EngineController {
             self.target_solved = true;
             if let Some(ref solved_state) = proof {
                 let thm_name = format!("target_solved_thm_{}", self.database.theorems.len() + 1);
-                self.database.record_theorem(&thm_name, target.clone(), solved_state.clone());
+                self.database
+                    .record_theorem(&thm_name, target.clone(), solved_state.clone());
                 let vec = vectorize_proof_state(solved_state);
                 self.vectordb.insert(
                     vec,
@@ -261,7 +274,8 @@ impl EngineController {
             let complexity = TheoryInventor::compute_complexity(&candidate);
 
             // Record in Lemma Database
-            self.database.record_theorem(&thm_name, candidate.clone(), solved_state.clone());
+            self.database
+                .record_theorem(&thm_name, candidate.clone(), solved_state.clone());
 
             // Index in Vector DB
             let vec = vectorize_proof_state(&solved_state);
@@ -350,12 +364,22 @@ impl EngineController {
 
         if total_loss > 0.0001 && total_loss < self.supervisor.best_loss {
             self.best_model_snapshot = self.model.clone();
-            let ckpt = ModelCheckpoint::new(self.model.clone(), epoch_num, total_loss, self.database.theorems.len());
+            let ckpt = ModelCheckpoint::new(
+                self.model.clone(),
+                epoch_num,
+                total_loss,
+                self.database.theorems.len(),
+            );
             let _ = ckpt.save_to_file("models/checkpoint_best.json");
         }
 
         if epoch_num % 5 == 0 && total_loss > 0.0001 {
-            let ckpt = ModelCheckpoint::new(self.model.clone(), epoch_num, total_loss, self.database.theorems.len());
+            let ckpt = ModelCheckpoint::new(
+                self.model.clone(),
+                epoch_num,
+                total_loss,
+                self.database.theorems.len(),
+            );
             let _ = ckpt.save_to_file("models/checkpoint_latest.json");
         }
 
@@ -408,17 +432,32 @@ pub async fn start_visualizer_server(port: u16, controller: EngineController) {
         .route("/api/train/stop", post(post_train_stop_handler))
         .route("/api/train/reset-lr", post(post_train_reset_lr_handler))
         .route("/api/train/telemetry", get(get_train_telemetry_handler))
-        .route("/api/train/target/start", post(post_train_target_start_handler))
-        .route("/api/train/target/telemetry", get(get_train_target_telemetry_handler))
-        .route("/api/discovery/continuous/start", post(post_continuous_discovery_start_handler))
-        .route("/api/discovery/continuous/stop", post(post_continuous_discovery_stop_handler))
+        .route(
+            "/api/train/target/start",
+            post(post_train_target_start_handler),
+        )
+        .route(
+            "/api/train/target/telemetry",
+            get(get_train_target_telemetry_handler),
+        )
+        .route(
+            "/api/discovery/continuous/start",
+            post(post_continuous_discovery_start_handler),
+        )
+        .route(
+            "/api/discovery/continuous/stop",
+            post(post_continuous_discovery_stop_handler),
+        )
         .route("/api/checkpoints", get(get_checkpoints_handler))
         .route("/api/checkpoints/rollback", post(post_rollback_handler))
         .route("/api/supervisor", get(get_supervisor_handler))
         .route("/api/invent", post(post_invent_handler))
         .route("/api/invented", get(get_invented_handler))
         .route("/api/conjecture", post(post_conjecture_handler))
-        .route("/api/conjecture/custom", post(post_custom_conjecture_handler))
+        .route(
+            "/api/conjecture/custom",
+            post(post_custom_conjecture_handler),
+        )
         .route("/api/reset", post(post_reset_handler))
         .route("/api/export/:format", get(get_export_handler))
         .route("/api/lean/validate", get(get_lean_validate_handler))
@@ -593,9 +632,7 @@ async fn post_step_handler(
     }))
 }
 
-async fn post_search_handler(
-    Extension(state): Extension<SharedState>,
-) -> Json<serde_json::Value> {
+async fn post_search_handler(Extension(state): Extension<SharedState>) -> Json<serde_json::Value> {
     let mut ctrl = state.write().await;
     let solved = ctrl.step_search(40);
     let snap = ctrl.mcts.snapshot();
@@ -678,14 +715,29 @@ async fn post_train_start_handler(
                 let ctrl = state_clone.read().await;
                 let epoch_num = ctrl.training_history.len() + 1;
                 let conjectures: Vec<_> = (0..episodes)
-                    .map(|g| ctrl.curriculum.generate_conjecture(epoch_num * episodes + g))
+                    .map(|g| {
+                        ctrl.curriculum
+                            .generate_conjecture(epoch_num * episodes + g)
+                    })
                     .collect();
-                (ctrl.model.clone(), ctrl.axioms.clone(), conjectures, epoch_num)
+                (
+                    ctrl.model.clone(),
+                    ctrl.axioms.clone(),
+                    conjectures,
+                    epoch_num,
+                )
             };
 
             let (samples, solved_count) = tokio::task::spawn_blocking(move || {
-                collect_parallel_self_play_trajectories(&model_snapshot, &axioms_snapshot, conjectures, 45)
-            }).await.unwrap_or((Vec::new(), 0));
+                collect_parallel_self_play_trajectories(
+                    &model_snapshot,
+                    &axioms_snapshot,
+                    conjectures,
+                    45,
+                )
+            })
+            .await
+            .unwrap_or((Vec::new(), 0));
 
             {
                 let mut ctrl = state_clone.write().await;
@@ -718,7 +770,11 @@ async fn post_train_target_start_handler(
 ) -> Json<serde_json::Value> {
     let parsed_target = match parse_conjecture(&req.target_equation) {
         Ok(eq) => eq,
-        Err(e) => return Json(serde_json::json!({ "status": "error", "message": format!("Syntax Error: {}", e) })),
+        Err(e) => {
+            return Json(
+                serde_json::json!({ "status": "error", "message": format!("Syntax Error: {}", e) }),
+            )
+        }
     };
 
     let is_already_training = {
@@ -754,12 +810,24 @@ async fn post_train_target_start_handler(
                 let ctrl = state_clone.read().await;
                 let epoch_num = ctrl.training_history.len() + 1;
                 let subproblems = GoalDecomposer::generate_subproblems(&target_for_spawn, episodes);
-                (ctrl.model.clone(), ctrl.axioms.clone(), subproblems, epoch_num)
+                (
+                    ctrl.model.clone(),
+                    ctrl.axioms.clone(),
+                    subproblems,
+                    epoch_num,
+                )
             };
 
             let (samples, solved_count) = tokio::task::spawn_blocking(move || {
-                collect_parallel_self_play_trajectories(&model_snapshot, &axioms_snapshot, conjectures, 50)
-            }).await.unwrap_or((Vec::new(), 0));
+                collect_parallel_self_play_trajectories(
+                    &model_snapshot,
+                    &axioms_snapshot,
+                    conjectures,
+                    50,
+                )
+            })
+            .await
+            .unwrap_or((Vec::new(), 0));
 
             let target_cracked = {
                 let mut ctrl = state_clone.write().await;
@@ -785,7 +853,9 @@ async fn post_train_target_start_handler(
     }))
 }
 
-async fn get_train_target_telemetry_handler(Extension(state): Extension<SharedState>) -> Json<serde_json::Value> {
+async fn get_train_target_telemetry_handler(
+    Extension(state): Extension<SharedState>,
+) -> Json<serde_json::Value> {
     let ctrl = state.read().await;
     let is_active = ctrl.is_training.load(Ordering::Relaxed);
     let target_str = ctrl.target_goal.as_ref().map(|g| g.to_string());
@@ -849,20 +919,26 @@ async fn post_continuous_discovery_start_handler(
     }))
 }
 
-async fn post_continuous_discovery_stop_handler(Extension(state): Extension<SharedState>) -> Json<serde_json::Value> {
+async fn post_continuous_discovery_stop_handler(
+    Extension(state): Extension<SharedState>,
+) -> Json<serde_json::Value> {
     let ctrl = state.read().await;
     ctrl.is_continuous_discovery.store(false, Ordering::SeqCst);
     Json(serde_json::json!({ "status": "continuous_discovery_stopped" }))
 }
 
-async fn post_train_stop_handler(Extension(state): Extension<SharedState>) -> Json<serde_json::Value> {
+async fn post_train_stop_handler(
+    Extension(state): Extension<SharedState>,
+) -> Json<serde_json::Value> {
     let ctrl = state.read().await;
     ctrl.is_training.store(false, Ordering::SeqCst);
     ctrl.is_continuous_discovery.store(false, Ordering::SeqCst);
     Json(serde_json::json!({ "status": "training_stopped" }))
 }
 
-async fn post_train_reset_lr_handler(Extension(state): Extension<SharedState>) -> Json<serde_json::Value> {
+async fn post_train_reset_lr_handler(
+    Extension(state): Extension<SharedState>,
+) -> Json<serde_json::Value> {
     let mut ctrl = state.write().await;
     ctrl.supervisor.reset_health(Some(0.005));
     ctrl.optimizer.set_learning_rate(0.005);
@@ -872,7 +948,9 @@ async fn post_train_reset_lr_handler(Extension(state): Extension<SharedState>) -
     }))
 }
 
-async fn get_train_telemetry_handler(Extension(state): Extension<SharedState>) -> Json<serde_json::Value> {
+async fn get_train_telemetry_handler(
+    Extension(state): Extension<SharedState>,
+) -> Json<serde_json::Value> {
     let ctrl = state.read().await;
     let is_active = ctrl.is_training.load(Ordering::Relaxed);
     let metrics = &ctrl.training_history;
@@ -927,7 +1005,9 @@ async fn post_rollback_handler(
     }
 }
 
-async fn get_supervisor_handler(Extension(state): Extension<SharedState>) -> Json<serde_json::Value> {
+async fn get_supervisor_handler(
+    Extension(state): Extension<SharedState>,
+) -> Json<serde_json::Value> {
     let ctrl = state.read().await;
     Json(serde_json::json!({
         "supervisor": ctrl.supervisor,
@@ -1067,7 +1147,9 @@ async fn get_export_handler(
     }
 }
 
-async fn get_lean_validate_handler(Extension(state): Extension<SharedState>) -> Json<serde_json::Value> {
+async fn get_lean_validate_handler(
+    Extension(state): Extension<SharedState>,
+) -> Json<serde_json::Value> {
     let ctrl = state.read().await;
     if let Some(proven_id) = ctrl.mcts.proven_node_id {
         let state_ref = &ctrl.mcts.nodes[proven_id].state;

@@ -106,7 +106,10 @@ impl NeuralPolicy for SymbolicNeuralPolicy {
         }
 
         // Apply Softmax normalization over candidate scores
-        let max_score = scores.iter().map(|(_, s)| *s).fold(f64::NEG_INFINITY, f64::max);
+        let max_score = scores
+            .iter()
+            .map(|(_, s)| *s)
+            .fold(f64::NEG_INFINITY, f64::max);
         let exp_scores: Vec<f64> = scores.iter().map(|(_, s)| (s - max_score).exp()).collect();
         let sum_exp: f64 = exp_scores.iter().sum();
 

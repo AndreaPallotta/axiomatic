@@ -31,7 +31,7 @@ pub struct CurriculumController {
     pub window_attempts: usize,
     pub window_solved: usize,
     pub graduation_threshold: f64, // Default: 80%
-    pub demotion_threshold: f64,    // Default: 30%
+    pub demotion_threshold: f64,   // Default: 30%
 }
 
 impl Default for CurriculumController {
@@ -70,11 +70,19 @@ impl CurriculumController {
 
             if solve_rate >= self.graduation_threshold {
                 let next_level = match self.current_level {
-                    DifficultyLevel::Level1Identities => DifficultyLevel::Level2CommutativeAssociative,
-                    DifficultyLevel::Level2CommutativeAssociative => DifficultyLevel::Level3Distributivity,
+                    DifficultyLevel::Level1Identities => {
+                        DifficultyLevel::Level2CommutativeAssociative
+                    }
+                    DifficultyLevel::Level2CommutativeAssociative => {
+                        DifficultyLevel::Level3Distributivity
+                    }
                     DifficultyLevel::Level3Distributivity => DifficultyLevel::Level4GroupInverses,
-                    DifficultyLevel::Level4GroupInverses => DifficultyLevel::Level5ComplexPolynomials,
-                    DifficultyLevel::Level5ComplexPolynomials => DifficultyLevel::Level5ComplexPolynomials,
+                    DifficultyLevel::Level4GroupInverses => {
+                        DifficultyLevel::Level5ComplexPolynomials
+                    }
+                    DifficultyLevel::Level5ComplexPolynomials => {
+                        DifficultyLevel::Level5ComplexPolynomials
+                    }
                 };
                 if next_level != self.current_level {
                     self.current_level = next_level;
@@ -82,10 +90,16 @@ impl CurriculumController {
                 }
             } else if solve_rate < self.demotion_threshold {
                 let prev_level = match self.current_level {
-                    DifficultyLevel::Level5ComplexPolynomials => DifficultyLevel::Level4GroupInverses,
+                    DifficultyLevel::Level5ComplexPolynomials => {
+                        DifficultyLevel::Level4GroupInverses
+                    }
                     DifficultyLevel::Level4GroupInverses => DifficultyLevel::Level3Distributivity,
-                    DifficultyLevel::Level3Distributivity => DifficultyLevel::Level2CommutativeAssociative,
-                    DifficultyLevel::Level2CommutativeAssociative => DifficultyLevel::Level1Identities,
+                    DifficultyLevel::Level3Distributivity => {
+                        DifficultyLevel::Level2CommutativeAssociative
+                    }
+                    DifficultyLevel::Level2CommutativeAssociative => {
+                        DifficultyLevel::Level1Identities
+                    }
                     DifficultyLevel::Level1Identities => DifficultyLevel::Level1Identities,
                 };
                 if prev_level != self.current_level {
@@ -107,78 +121,113 @@ impl CurriculumController {
         let one = Term::constant("1");
 
         match self.current_level {
-            DifficultyLevel::Level1Identities => {
-                match seed % 3 {
-                    0 => Equality::new(
-                        Term::func("+", vec![x.clone(), zero.clone()]),
-                        Term::func("+", vec![zero.clone(), x.clone()]),
+            DifficultyLevel::Level1Identities => match seed % 3 {
+                0 => Equality::new(
+                    Term::func("+", vec![x.clone(), zero.clone()]),
+                    Term::func("+", vec![zero.clone(), x.clone()]),
+                ),
+                1 => Equality::new(
+                    Term::func("*", vec![x.clone(), one.clone()]),
+                    Term::func("*", vec![one.clone(), x.clone()]),
+                ),
+                _ => Equality::new(Term::func("+", vec![y.clone(), zero.clone()]), y.clone()),
+            },
+            DifficultyLevel::Level2CommutativeAssociative => match seed % 3 {
+                0 => Equality::new(
+                    Term::func(
+                        "+",
+                        vec![Term::func("+", vec![x.clone(), y.clone()]), zero.clone()],
                     ),
-                    1 => Equality::new(
-                        Term::func("*", vec![x.clone(), one.clone()]),
-                        Term::func("*", vec![one.clone(), x.clone()]),
+                    Term::func("+", vec![y.clone(), x.clone()]),
+                ),
+                1 => Equality::new(
+                    Term::func(
+                        "+",
+                        vec![x.clone(), Term::func("+", vec![y.clone(), z.clone()])],
                     ),
-                    _ => Equality::new(
-                        Term::func("+", vec![y.clone(), zero.clone()]),
-                        y.clone(),
+                    Term::func(
+                        "+",
+                        vec![Term::func("+", vec![z.clone(), y.clone()]), x.clone()],
                     ),
-                }
-            }
-            DifficultyLevel::Level2CommutativeAssociative => {
-                match seed % 3 {
-                    0 => Equality::new(
-                        Term::func("+", vec![Term::func("+", vec![x.clone(), y.clone()]), zero.clone()]),
-                        Term::func("+", vec![y.clone(), x.clone()]),
+                ),
+                _ => Equality::new(
+                    Term::func(
+                        "*",
+                        vec![Term::func("*", vec![x.clone(), y.clone()]), one.clone()],
                     ),
-                    1 => Equality::new(
-                        Term::func("+", vec![x.clone(), Term::func("+", vec![y.clone(), z.clone()])]),
-                        Term::func("+", vec![Term::func("+", vec![z.clone(), y.clone()]), x.clone()]),
-                    ),
-                    _ => Equality::new(
-                        Term::func("*", vec![Term::func("*", vec![x.clone(), y.clone()]), one.clone()]),
-                        Term::func("*", vec![y.clone(), x.clone()]),
-                    ),
-                }
-            }
-            DifficultyLevel::Level3Distributivity => {
-                match seed % 3 {
-                    0 => Equality::new(
-                        Term::func("+", vec![Term::func("+", vec![x.clone(), zero.clone()]), Term::func("*", vec![y.clone(), one.clone()])]),
-                        Term::func("+", vec![Term::func("*", vec![one.clone(), y.clone()]), Term::func("+", vec![zero.clone(), x.clone()])]),
-                    ),
-                    1 => Equality::new(
-                        Term::func("*", vec![x.clone(), Term::func("+", vec![y.clone(), zero.clone()])]),
-                        Term::func("*", vec![y.clone(), x.clone()]),
-                    ),
-                    _ => Equality::new(
-                        Term::func("*", vec![one.clone(), Term::func("+", vec![x.clone(), y.clone()])]),
-                        Term::func("+", vec![y.clone(), x.clone()]),
-                    ),
-                }
-            }
-            DifficultyLevel::Level4GroupInverses => {
-                match seed % 2 {
-                    0 => Equality::new(
-                        Term::func("+", vec![Term::func("+", vec![x.clone(), Term::func("-", vec![x.clone()])]), y.clone()]),
-                        Term::func("+", vec![zero.clone(), y.clone()]),
-                    ),
-                    _ => Equality::new(
-                        Term::func("+", vec![x.clone(), Term::func("+", vec![y.clone(), Term::func("-", vec![y.clone()])])]),
-                        Term::func("+", vec![x.clone(), zero.clone()]),
-                    ),
-                }
-            }
-            DifficultyLevel::Level5ComplexPolynomials => {
-                Equality::new(
+                    Term::func("*", vec![y.clone(), x.clone()]),
+                ),
+            },
+            DifficultyLevel::Level3Distributivity => match seed % 3 {
+                0 => Equality::new(
                     Term::func(
                         "+",
                         vec![
-                            Term::func("*", vec![Term::func("+", vec![x.clone(), zero.clone()]), one.clone()]),
-                            Term::func("*", vec![Term::func("+", vec![y.clone(), zero.clone()]), one.clone()]),
+                            Term::func("+", vec![x.clone(), zero.clone()]),
+                            Term::func("*", vec![y.clone(), one.clone()]),
                         ],
                     ),
+                    Term::func(
+                        "+",
+                        vec![
+                            Term::func("*", vec![one.clone(), y.clone()]),
+                            Term::func("+", vec![zero.clone(), x.clone()]),
+                        ],
+                    ),
+                ),
+                1 => Equality::new(
+                    Term::func(
+                        "*",
+                        vec![x.clone(), Term::func("+", vec![y.clone(), zero.clone()])],
+                    ),
+                    Term::func("*", vec![y.clone(), x.clone()]),
+                ),
+                _ => Equality::new(
+                    Term::func(
+                        "*",
+                        vec![one.clone(), Term::func("+", vec![x.clone(), y.clone()])],
+                    ),
                     Term::func("+", vec![y.clone(), x.clone()]),
-                )
-            }
+                ),
+            },
+            DifficultyLevel::Level4GroupInverses => match seed % 2 {
+                0 => Equality::new(
+                    Term::func(
+                        "+",
+                        vec![
+                            Term::func("+", vec![x.clone(), Term::func("-", vec![x.clone()])]),
+                            y.clone(),
+                        ],
+                    ),
+                    Term::func("+", vec![zero.clone(), y.clone()]),
+                ),
+                _ => Equality::new(
+                    Term::func(
+                        "+",
+                        vec![
+                            x.clone(),
+                            Term::func("+", vec![y.clone(), Term::func("-", vec![y.clone()])]),
+                        ],
+                    ),
+                    Term::func("+", vec![x.clone(), zero.clone()]),
+                ),
+            },
+            DifficultyLevel::Level5ComplexPolynomials => Equality::new(
+                Term::func(
+                    "+",
+                    vec![
+                        Term::func(
+                            "*",
+                            vec![Term::func("+", vec![x.clone(), zero.clone()]), one.clone()],
+                        ),
+                        Term::func(
+                            "*",
+                            vec![Term::func("+", vec![y.clone(), zero.clone()]), one.clone()],
+                        ),
+                    ],
+                ),
+                Term::func("+", vec![y.clone(), x.clone()]),
+            ),
         }
     }
 }
@@ -197,6 +246,9 @@ mod tests {
             curr.record_attempt(true);
         }
 
-        assert_eq!(curr.current_level, DifficultyLevel::Level2CommutativeAssociative);
+        assert_eq!(
+            curr.current_level,
+            DifficultyLevel::Level2CommutativeAssociative
+        );
     }
 }

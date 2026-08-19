@@ -96,15 +96,9 @@ impl GoalDecomposer {
             let idx = rng.gen_range(0..subproblems.len());
             let base = subproblems[idx].clone();
             let perturb = if rng.gen_bool(0.5) {
-                Equality::new(
-                    Term::func("+", vec![base.lhs, zero.clone()]),
-                    base.rhs,
-                )
+                Equality::new(Term::func("+", vec![base.lhs, zero.clone()]), base.rhs)
             } else {
-                Equality::new(
-                    base.lhs,
-                    Term::func("*", vec![base.rhs, one.clone()]),
-                )
+                Equality::new(base.lhs, Term::func("*", vec![base.rhs, one.clone()]))
             };
             subproblems.push(perturb);
         }
@@ -127,10 +121,13 @@ mod tests {
 
         // ((x + 0) + (y * 1)) = (y + x)
         let eq = Equality::new(
-            Term::func("+", vec![
-                Term::func("+", vec![x.clone(), zero.clone()]),
-                Term::func("*", vec![y.clone(), one.clone()]),
-            ]),
+            Term::func(
+                "+",
+                vec![
+                    Term::func("+", vec![x.clone(), zero.clone()]),
+                    Term::func("*", vec![y.clone(), one.clone()]),
+                ],
+            ),
             Term::func("+", vec![y.clone(), x.clone()]),
         );
 

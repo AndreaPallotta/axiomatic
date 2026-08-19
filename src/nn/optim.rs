@@ -189,17 +189,105 @@ impl AdamOptimizer {
         let eps = self.eps;
         let t = self.step_t;
 
-        apply_adam(lr, b1, b2, eps, t, &mut model.w1.data, &grad_w1, &mut self.m_w1, &mut self.v_w1, batch_size);
-        apply_adam(lr, b1, b2, eps, t, &mut model.b1, &grad_b1, &mut self.m_b1, &mut self.v_b1, batch_size);
+        apply_adam(
+            lr,
+            b1,
+            b2,
+            eps,
+            t,
+            &mut model.w1.data,
+            &grad_w1,
+            &mut self.m_w1,
+            &mut self.v_w1,
+            batch_size,
+        );
+        apply_adam(
+            lr,
+            b1,
+            b2,
+            eps,
+            t,
+            &mut model.b1,
+            &grad_b1,
+            &mut self.m_b1,
+            &mut self.v_b1,
+            batch_size,
+        );
 
-        apply_adam(lr, b1, b2, eps, t, &mut model.w2.data, &grad_w2, &mut self.m_w2, &mut self.v_w2, batch_size);
-        apply_adam(lr, b1, b2, eps, t, &mut model.b2, &grad_b2, &mut self.m_b2, &mut self.v_b2, batch_size);
+        apply_adam(
+            lr,
+            b1,
+            b2,
+            eps,
+            t,
+            &mut model.w2.data,
+            &grad_w2,
+            &mut self.m_w2,
+            &mut self.v_w2,
+            batch_size,
+        );
+        apply_adam(
+            lr,
+            b1,
+            b2,
+            eps,
+            t,
+            &mut model.b2,
+            &grad_b2,
+            &mut self.m_b2,
+            &mut self.v_b2,
+            batch_size,
+        );
 
-        apply_adam(lr, b1, b2, eps, t, &mut model.w_policy.data, &grad_wp, &mut self.m_wp, &mut self.v_wp, batch_size);
-        apply_adam(lr, b1, b2, eps, t, &mut model.b_policy, &grad_bp, &mut self.m_bp, &mut self.v_bp, batch_size);
+        apply_adam(
+            lr,
+            b1,
+            b2,
+            eps,
+            t,
+            &mut model.w_policy.data,
+            &grad_wp,
+            &mut self.m_wp,
+            &mut self.v_wp,
+            batch_size,
+        );
+        apply_adam(
+            lr,
+            b1,
+            b2,
+            eps,
+            t,
+            &mut model.b_policy,
+            &grad_bp,
+            &mut self.m_bp,
+            &mut self.v_bp,
+            batch_size,
+        );
 
-        apply_adam(lr, b1, b2, eps, t, &mut model.w_value.data, &grad_wv, &mut self.m_wv, &mut self.v_wv, batch_size);
-        apply_adam(lr, b1, b2, eps, t, &mut model.b_value, &grad_bv, &mut self.m_bv, &mut self.v_bv, batch_size);
+        apply_adam(
+            lr,
+            b1,
+            b2,
+            eps,
+            t,
+            &mut model.w_value.data,
+            &grad_wv,
+            &mut self.m_wv,
+            &mut self.v_wv,
+            batch_size,
+        );
+        apply_adam(
+            lr,
+            b1,
+            b2,
+            eps,
+            t,
+            &mut model.b_value,
+            &grad_bv,
+            &mut self.m_bv,
+            &mut self.v_bv,
+            batch_size,
+        );
 
         let avg_pol_loss = total_pol_loss / batch_size;
         let avg_val_loss = total_val_loss / batch_size;

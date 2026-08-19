@@ -45,7 +45,10 @@ impl InductionEngine {
         let mut new_history = state.proof_history.clone();
         new_history.push((
             Tactic::ApplyAxiom(format!("induction on {}", var_name)),
-            format!("Split into Base Case (n=0) and Inductive Step (n=succ({}))", var_name),
+            format!(
+                "Split into Base Case (n=0) and Inductive Step (n=succ({}))",
+                var_name
+            ),
         ));
 
         let mut next_state = ProofState {
@@ -68,10 +71,7 @@ mod tests {
     fn test_peano_induction_split() {
         let n = Term::constant("n");
         let zero = Term::constant("0");
-        let goal_eq = Equality::new(
-            Term::func("+", vec![n.clone(), zero.clone()]),
-            n.clone(),
-        );
+        let goal_eq = Equality::new(Term::func("+", vec![n.clone(), zero.clone()]), n.clone());
 
         let initial_state = ProofState::new(goal_eq);
         let inductive_state = InductionEngine::apply_induction(&initial_state, "n")
@@ -79,7 +79,10 @@ mod tests {
 
         assert_eq!(inductive_state.open_goals.len(), 2);
         // Base case: 0 + 0 = 0
-        assert_eq!(inductive_state.open_goals[0].equality.to_string(), "(0 + 0) = 0");
+        assert_eq!(
+            inductive_state.open_goals[0].equality.to_string(),
+            "(0 + 0) = 0"
+        );
         // Inductive step: succ(n_k) + 0 = succ(n_k)
         assert_eq!(
             inductive_state.open_goals[1].equality.to_string(),

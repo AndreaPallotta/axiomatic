@@ -8,10 +8,10 @@ pub struct MctsNode {
     pub parent_id: Option<usize>,
     pub state: ProofState,
     pub applied_tactic: Option<Tactic>,
-    pub visit_count: usize,     // N(s)
-    pub total_value: f64,       // W(s)
-    pub mean_value: f64,        // Q(s) = W(s) / N(s)
-    pub policy_prior: f64,      // P(s, a) from neural policy network
+    pub visit_count: usize, // N(s)
+    pub total_value: f64,   // W(s)
+    pub mean_value: f64,    // Q(s) = W(s) / N(s)
+    pub policy_prior: f64,  // P(s, a) from neural policy network
     pub children_ids: Vec<usize>,
     pub is_expanded: bool,
     pub is_terminal: bool,

@@ -28,9 +28,19 @@ pub struct RollbackEvent {
 #[derive(Debug, Clone)]
 pub enum SupervisorAction {
     Continue,
-    AdjustLearningRate { old_lr: f64, new_lr: f64 },
-    Rollback { bad_loss: f64, restored_loss: f64, new_lr: f64, reason: String },
-    EarlyStop { reason: String },
+    AdjustLearningRate {
+        old_lr: f64,
+        new_lr: f64,
+    },
+    Rollback {
+        bad_loss: f64,
+        restored_loss: f64,
+        new_lr: f64,
+        reason: String,
+    },
+    EarlyStop {
+        reason: String,
+    },
 }
 
 /// Production Supervisor monitoring convergence, plateau, and auto-rollback
@@ -90,7 +100,11 @@ impl TrainingSupervisor {
         }
 
         // 1. Check for NaN / Inf / Catastrophic Divergence
-        let is_diverged = loss.is_nan() || loss.is_infinite() || (self.moving_avg_loss > 0.0 && loss > self.moving_avg_loss * self.divergence_multiplier && loss > 2.0);
+        let is_diverged = loss.is_nan()
+            || loss.is_infinite()
+            || (self.moving_avg_loss > 0.0
+                && loss > self.moving_avg_loss * self.divergence_multiplier
+                && loss > 2.0);
 
         if is_diverged {
             let reason = if loss.is_nan() {
@@ -98,7 +112,10 @@ impl TrainingSupervisor {
             } else if loss.is_infinite() {
                 "Loss reached Infinity".to_string()
             } else {
-                format!("Loss spiked from {:.4} (EMA) to {:.4}", self.moving_avg_loss, loss)
+                format!(
+                    "Loss spiked from {:.4} (EMA) to {:.4}",
+                    self.moving_avg_loss, loss
+                )
             };
 
             // Execute Self-Healing Rollback
@@ -159,7 +176,10 @@ impl TrainingSupervisor {
                 // Minimum LR reached and still plateaued
                 self.status = TrainingHealthStatus::EarlyStopped;
                 return SupervisorAction::EarlyStop {
-                    reason: format!("Convergence reached with minimum learning rate ({:.6})", self.min_lr),
+                    reason: format!(
+                        "Convergence reached with minimum learning rate ({:.6})",
+                        self.min_lr
+                    ),
                 };
             }
         }
@@ -250,7 +270,11 @@ mod tests {
         };
         let action = supervisor.evaluate_step(&mut model, &mut optim, &best_snapshot, &m2);
         match action {
-            SupervisorAction::Rollback { bad_loss, restored_loss, .. } => {
+            SupervisorAction::Rollback {
+                bad_loss,
+                restored_loss,
+                ..
+            } => {
                 assert_eq!(bad_loss, 8.5);
                 assert_eq!(restored_loss, 1.0);
             }

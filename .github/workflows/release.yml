@@ -49,12 +49,14 @@ jobs:
       - name: Package Unix Archive
         if: runner.os != 'Windows'
         run: |
-          tar -czf ${{ matrix.archive }} -C target/${{ matrix.target }}/release ${{ matrix.bin_name }} README.md LICENSE models/checkpoint_baseline.json
+          cp target/${{ matrix.target }}/release/${{ matrix.bin_name }} ./
+          tar -czf ${{ matrix.archive }} ${{ matrix.bin_name }} README.md LICENSE models/checkpoint_baseline.json
 
       - name: Package Windows Archive
         if: runner.os == 'Windows'
         run: |
-          Compress-Archive -Path target/${{ matrix.target }}/release/${{ matrix.bin_name }}, README.md, LICENSE, models/checkpoint_baseline.json -DestinationPath ${{ matrix.archive }}
+          Copy-Item -Path target/${{ matrix.target }}/release/${{ matrix.bin_name }} -Destination ./
+          Compress-Archive -Path ${{ matrix.bin_name }}, README.md, LICENSE, models/checkpoint_baseline.json -DestinationPath ${{ matrix.archive }}
 
       - name: Upload Binary Artifact
         uses: actions/upload-artifact@v4
@@ -91,6 +93,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -104,7 +112,7 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
-            type=semver,pattern={{version}}
+            type=ref,event=tag
             type=raw,value=latest
 
       - name: Build and Push Docker Image

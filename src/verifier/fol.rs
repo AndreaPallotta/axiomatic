@@ -108,7 +108,14 @@ impl fmt::Display for Term {
             Term::Var(name) => write!(f, "?{}", name),
             Term::Const(name) => write!(f, "{}", name),
             Term::Func(name, args) => {
-                if args.len() == 2 && (name == "+" || name == "*" || name == "·" || name == "^" || name == "&" || name == "|") {
+                if args.len() == 2
+                    && (name == "+"
+                        || name == "*"
+                        || name == "·"
+                        || name == "^"
+                        || name == "&"
+                        || name == "|")
+                {
                     write!(f, "({} {} {})", args[0], name, args[1])
                 } else if args.len() == 1 && (name == "-" || name == "!") {
                     write!(f, "{}{}", name, args[0])

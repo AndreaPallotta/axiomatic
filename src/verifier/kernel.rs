@@ -5,12 +5,12 @@ use std::fmt;
 /// An applied tactic / transformation step in the proof
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Tactic {
-    RewriteLhs(String),      // Rule name
-    RewriteRhs(String),      // Rule name
-    Symmetry,                // A = B -> B = A
-    Reflexivity,             // A = A is trivially true (Q.E.D.)
-    Transitivity(Term),      // A = B via intermediate term C
-    ApplyAxiom(String),      // Apply a known axiom
+    RewriteLhs(String), // Rule name
+    RewriteRhs(String), // Rule name
+    Symmetry,           // A = B -> B = A
+    Reflexivity,        // A = A is trivially true (Q.E.D.)
+    Transitivity(Term), // A = B via intermediate term C
+    ApplyAxiom(String), // Apply a known axiom
 }
 
 impl fmt::Display for Tactic {
@@ -147,8 +147,14 @@ impl AxiomLibrary {
         lib.add_rule(
             "add_assoc",
             Equality::new(
-                Term::func("+", vec![Term::func("+", vec![x.clone(), y.clone()]), z.clone()]),
-                Term::func("+", vec![x.clone(), Term::func("+", vec![y.clone(), z.clone()])]),
+                Term::func(
+                    "+",
+                    vec![Term::func("+", vec![x.clone(), y.clone()]), z.clone()],
+                ),
+                Term::func(
+                    "+",
+                    vec![x.clone(), Term::func("+", vec![y.clone(), z.clone()])],
+                ),
             ),
         );
         lib.add_rule(
@@ -182,14 +188,23 @@ impl AxiomLibrary {
         lib.add_rule(
             "mul_assoc",
             Equality::new(
-                Term::func("*", vec![Term::func("*", vec![x.clone(), y.clone()]), z.clone()]),
-                Term::func("*", vec![x.clone(), Term::func("*", vec![y.clone(), z.clone()])]),
+                Term::func(
+                    "*",
+                    vec![Term::func("*", vec![x.clone(), y.clone()]), z.clone()],
+                ),
+                Term::func(
+                    "*",
+                    vec![x.clone(), Term::func("*", vec![y.clone(), z.clone()])],
+                ),
             ),
         );
         lib.add_rule(
             "distrib_left",
             Equality::new(
-                Term::func("*", vec![x.clone(), Term::func("+", vec![y.clone(), z.clone()])]),
+                Term::func(
+                    "*",
+                    vec![x.clone(), Term::func("+", vec![y.clone(), z.clone()])],
+                ),
                 Term::func(
                     "+",
                     vec![
@@ -213,33 +228,117 @@ impl AxiomLibrary {
 
         let mut lib = Self::empty();
 
-        lib.add_rule("and_true", Equality::new(Term::func("&", vec![a.clone(), one.clone()]), a.clone()));
-        lib.add_rule("true_and", Equality::new(Term::func("&", vec![one.clone(), a.clone()]), a.clone()));
-        lib.add_rule("or_false", Equality::new(Term::func("|", vec![a.clone(), zero.clone()]), a.clone()));
-        lib.add_rule("false_or", Equality::new(Term::func("|", vec![zero.clone(), a.clone()]), a.clone()));
-        lib.add_rule("and_false", Equality::new(Term::func("&", vec![a.clone(), zero.clone()]), zero.clone()));
-        lib.add_rule("or_true", Equality::new(Term::func("|", vec![a.clone(), one.clone()]), one.clone()));
-        lib.add_rule("and_comm", Equality::new(Term::func("&", vec![a.clone(), b.clone()]), Term::func("&", vec![b.clone(), a.clone()])));
-        lib.add_rule("or_comm", Equality::new(Term::func("|", vec![a.clone(), b.clone()]), Term::func("|", vec![b.clone(), a.clone()])));
-        lib.add_rule("and_assoc", Equality::new(
-            Term::func("&", vec![Term::func("&", vec![a.clone(), b.clone()]), c.clone()]),
-            Term::func("&", vec![a.clone(), Term::func("&", vec![b.clone(), c.clone()])]),
-        ));
-        lib.add_rule("or_assoc", Equality::new(
-            Term::func("|", vec![Term::func("|", vec![a.clone(), b.clone()]), c.clone()]),
-            Term::func("|", vec![a.clone(), Term::func("|", vec![b.clone(), c.clone()])]),
-        ));
-        lib.add_rule("not_not", Equality::new(Term::func("!", vec![Term::func("!", vec![a.clone()])]), a.clone()));
-        lib.add_rule("and_not", Equality::new(Term::func("&", vec![a.clone(), Term::func("!", vec![a.clone()])]), zero.clone()));
-        lib.add_rule("or_not", Equality::new(Term::func("|", vec![a.clone(), Term::func("!", vec![a.clone()])]), one.clone()));
-        lib.add_rule("de_morgan_and", Equality::new(
-            Term::func("!", vec![Term::func("&", vec![a.clone(), b.clone()])]),
-            Term::func("|", vec![Term::func("!", vec![a.clone()]), Term::func("!", vec![b.clone()])]),
-        ));
-        lib.add_rule("de_morgan_or", Equality::new(
-            Term::func("!", vec![Term::func("|", vec![a.clone(), b.clone()])]),
-            Term::func("&", vec![Term::func("!", vec![a.clone()]), Term::func("!", vec![b.clone()])]),
-        ));
+        lib.add_rule(
+            "and_true",
+            Equality::new(Term::func("&", vec![a.clone(), one.clone()]), a.clone()),
+        );
+        lib.add_rule(
+            "true_and",
+            Equality::new(Term::func("&", vec![one.clone(), a.clone()]), a.clone()),
+        );
+        lib.add_rule(
+            "or_false",
+            Equality::new(Term::func("|", vec![a.clone(), zero.clone()]), a.clone()),
+        );
+        lib.add_rule(
+            "false_or",
+            Equality::new(Term::func("|", vec![zero.clone(), a.clone()]), a.clone()),
+        );
+        lib.add_rule(
+            "and_false",
+            Equality::new(Term::func("&", vec![a.clone(), zero.clone()]), zero.clone()),
+        );
+        lib.add_rule(
+            "or_true",
+            Equality::new(Term::func("|", vec![a.clone(), one.clone()]), one.clone()),
+        );
+        lib.add_rule(
+            "and_comm",
+            Equality::new(
+                Term::func("&", vec![a.clone(), b.clone()]),
+                Term::func("&", vec![b.clone(), a.clone()]),
+            ),
+        );
+        lib.add_rule(
+            "or_comm",
+            Equality::new(
+                Term::func("|", vec![a.clone(), b.clone()]),
+                Term::func("|", vec![b.clone(), a.clone()]),
+            ),
+        );
+        lib.add_rule(
+            "and_assoc",
+            Equality::new(
+                Term::func(
+                    "&",
+                    vec![Term::func("&", vec![a.clone(), b.clone()]), c.clone()],
+                ),
+                Term::func(
+                    "&",
+                    vec![a.clone(), Term::func("&", vec![b.clone(), c.clone()])],
+                ),
+            ),
+        );
+        lib.add_rule(
+            "or_assoc",
+            Equality::new(
+                Term::func(
+                    "|",
+                    vec![Term::func("|", vec![a.clone(), b.clone()]), c.clone()],
+                ),
+                Term::func(
+                    "|",
+                    vec![a.clone(), Term::func("|", vec![b.clone(), c.clone()])],
+                ),
+            ),
+        );
+        lib.add_rule(
+            "not_not",
+            Equality::new(
+                Term::func("!", vec![Term::func("!", vec![a.clone()])]),
+                a.clone(),
+            ),
+        );
+        lib.add_rule(
+            "and_not",
+            Equality::new(
+                Term::func("&", vec![a.clone(), Term::func("!", vec![a.clone()])]),
+                zero.clone(),
+            ),
+        );
+        lib.add_rule(
+            "or_not",
+            Equality::new(
+                Term::func("|", vec![a.clone(), Term::func("!", vec![a.clone()])]),
+                one.clone(),
+            ),
+        );
+        lib.add_rule(
+            "de_morgan_and",
+            Equality::new(
+                Term::func("!", vec![Term::func("&", vec![a.clone(), b.clone()])]),
+                Term::func(
+                    "|",
+                    vec![
+                        Term::func("!", vec![a.clone()]),
+                        Term::func("!", vec![b.clone()]),
+                    ],
+                ),
+            ),
+        );
+        lib.add_rule(
+            "de_morgan_or",
+            Equality::new(
+                Term::func("!", vec![Term::func("|", vec![a.clone(), b.clone()])]),
+                Term::func(
+                    "&",
+                    vec![
+                        Term::func("!", vec![a.clone()]),
+                        Term::func("!", vec![b.clone()]),
+                    ],
+                ),
+            ),
+        );
 
         lib
     }
@@ -253,26 +352,68 @@ impl AxiomLibrary {
 
         let mut lib = Self::empty();
 
-        lib.add_rule("d_const_0", Equality::new(Term::func("D", vec![zero.clone()]), zero.clone()));
-        lib.add_rule("d_const_1", Equality::new(Term::func("D", vec![one.clone()]), zero.clone()));
-        lib.add_rule("d_var", Equality::new(Term::func("D", vec![Term::constant("x")]), one.clone()));
-        lib.add_rule("d_sum", Equality::new(
-            Term::func("D", vec![Term::func("+", vec![u.clone(), v.clone()])]),
-            Term::func("+", vec![Term::func("D", vec![u.clone()]), Term::func("D", vec![v.clone()])]),
-        ));
-        lib.add_rule("d_prod", Equality::new(
-            Term::func("D", vec![Term::func("*", vec![u.clone(), v.clone()])]),
-            Term::func("+", vec![
-                Term::func("*", vec![Term::func("D", vec![u.clone()]), v.clone()]),
-                Term::func("*", vec![u.clone(), Term::func("D", vec![v.clone()])]),
-            ]),
-        ));
-        lib.add_rule("add_zero", Equality::new(Term::func("+", vec![u.clone(), zero.clone()]), u.clone()));
-        lib.add_rule("zero_add", Equality::new(Term::func("+", vec![zero.clone(), u.clone()]), u.clone()));
-        lib.add_rule("mul_one", Equality::new(Term::func("*", vec![u.clone(), one.clone()]), u.clone()));
-        lib.add_rule("one_mul", Equality::new(Term::func("*", vec![one.clone(), u.clone()]), u.clone()));
-        lib.add_rule("mul_zero", Equality::new(Term::func("*", vec![u.clone(), zero.clone()]), zero.clone()));
-        lib.add_rule("zero_mul", Equality::new(Term::func("*", vec![zero.clone(), u.clone()]), zero.clone()));
+        lib.add_rule(
+            "d_const_0",
+            Equality::new(Term::func("D", vec![zero.clone()]), zero.clone()),
+        );
+        lib.add_rule(
+            "d_const_1",
+            Equality::new(Term::func("D", vec![one.clone()]), zero.clone()),
+        );
+        lib.add_rule(
+            "d_var",
+            Equality::new(Term::func("D", vec![Term::constant("x")]), one.clone()),
+        );
+        lib.add_rule(
+            "d_sum",
+            Equality::new(
+                Term::func("D", vec![Term::func("+", vec![u.clone(), v.clone()])]),
+                Term::func(
+                    "+",
+                    vec![
+                        Term::func("D", vec![u.clone()]),
+                        Term::func("D", vec![v.clone()]),
+                    ],
+                ),
+            ),
+        );
+        lib.add_rule(
+            "d_prod",
+            Equality::new(
+                Term::func("D", vec![Term::func("*", vec![u.clone(), v.clone()])]),
+                Term::func(
+                    "+",
+                    vec![
+                        Term::func("*", vec![Term::func("D", vec![u.clone()]), v.clone()]),
+                        Term::func("*", vec![u.clone(), Term::func("D", vec![v.clone()])]),
+                    ],
+                ),
+            ),
+        );
+        lib.add_rule(
+            "add_zero",
+            Equality::new(Term::func("+", vec![u.clone(), zero.clone()]), u.clone()),
+        );
+        lib.add_rule(
+            "zero_add",
+            Equality::new(Term::func("+", vec![zero.clone(), u.clone()]), u.clone()),
+        );
+        lib.add_rule(
+            "mul_one",
+            Equality::new(Term::func("*", vec![u.clone(), one.clone()]), u.clone()),
+        );
+        lib.add_rule(
+            "one_mul",
+            Equality::new(Term::func("*", vec![one.clone(), u.clone()]), u.clone()),
+        );
+        lib.add_rule(
+            "mul_zero",
+            Equality::new(Term::func("*", vec![u.clone(), zero.clone()]), zero.clone()),
+        );
+        lib.add_rule(
+            "zero_mul",
+            Equality::new(Term::func("*", vec![zero.clone(), u.clone()]), zero.clone()),
+        );
 
         lib
     }
@@ -287,23 +428,107 @@ impl AxiomLibrary {
 
         let mut lib = Self::empty();
 
-        lib.add_rule("inter_univ", Equality::new(Term::func("inter", vec![a.clone(), univ.clone()]), a.clone()));
-        lib.add_rule("union_empty", Equality::new(Term::func("union", vec![a.clone(), empty.clone()]), a.clone()));
-        lib.add_rule("inter_empty", Equality::new(Term::func("inter", vec![a.clone(), empty.clone()]), empty.clone()));
-        lib.add_rule("union_univ", Equality::new(Term::func("union", vec![a.clone(), univ.clone()]), univ.clone()));
-        lib.add_rule("inter_comm", Equality::new(Term::func("inter", vec![a.clone(), b.clone()]), Term::func("inter", vec![b.clone(), a.clone()])));
-        lib.add_rule("union_comm", Equality::new(Term::func("union", vec![a.clone(), b.clone()]), Term::func("union", vec![b.clone(), a.clone()])));
-        lib.add_rule("comp_comp", Equality::new(Term::func("comp", vec![Term::func("comp", vec![a.clone()])]), a.clone()));
-        lib.add_rule("inter_comp", Equality::new(Term::func("inter", vec![a.clone(), Term::func("comp", vec![a.clone()])]), empty.clone()));
-        lib.add_rule("union_comp", Equality::new(Term::func("union", vec![a.clone(), Term::func("comp", vec![a.clone()])]), univ.clone()));
-        lib.add_rule("de_morgan_inter", Equality::new(
-            Term::func("comp", vec![Term::func("inter", vec![a.clone(), b.clone()])]),
-            Term::func("union", vec![Term::func("comp", vec![a.clone()]), Term::func("comp", vec![b.clone()])]),
-        ));
-        lib.add_rule("de_morgan_union", Equality::new(
-            Term::func("comp", vec![Term::func("union", vec![a.clone(), b.clone()])]),
-            Term::func("inter", vec![Term::func("comp", vec![a.clone()]), Term::func("comp", vec![b.clone()])]),
-        ));
+        lib.add_rule(
+            "inter_univ",
+            Equality::new(
+                Term::func("inter", vec![a.clone(), univ.clone()]),
+                a.clone(),
+            ),
+        );
+        lib.add_rule(
+            "union_empty",
+            Equality::new(
+                Term::func("union", vec![a.clone(), empty.clone()]),
+                a.clone(),
+            ),
+        );
+        lib.add_rule(
+            "inter_empty",
+            Equality::new(
+                Term::func("inter", vec![a.clone(), empty.clone()]),
+                empty.clone(),
+            ),
+        );
+        lib.add_rule(
+            "union_univ",
+            Equality::new(
+                Term::func("union", vec![a.clone(), univ.clone()]),
+                univ.clone(),
+            ),
+        );
+        lib.add_rule(
+            "inter_comm",
+            Equality::new(
+                Term::func("inter", vec![a.clone(), b.clone()]),
+                Term::func("inter", vec![b.clone(), a.clone()]),
+            ),
+        );
+        lib.add_rule(
+            "union_comm",
+            Equality::new(
+                Term::func("union", vec![a.clone(), b.clone()]),
+                Term::func("union", vec![b.clone(), a.clone()]),
+            ),
+        );
+        lib.add_rule(
+            "comp_comp",
+            Equality::new(
+                Term::func("comp", vec![Term::func("comp", vec![a.clone()])]),
+                a.clone(),
+            ),
+        );
+        lib.add_rule(
+            "inter_comp",
+            Equality::new(
+                Term::func(
+                    "inter",
+                    vec![a.clone(), Term::func("comp", vec![a.clone()])],
+                ),
+                empty.clone(),
+            ),
+        );
+        lib.add_rule(
+            "union_comp",
+            Equality::new(
+                Term::func(
+                    "union",
+                    vec![a.clone(), Term::func("comp", vec![a.clone()])],
+                ),
+                univ.clone(),
+            ),
+        );
+        lib.add_rule(
+            "de_morgan_inter",
+            Equality::new(
+                Term::func(
+                    "comp",
+                    vec![Term::func("inter", vec![a.clone(), b.clone()])],
+                ),
+                Term::func(
+                    "union",
+                    vec![
+                        Term::func("comp", vec![a.clone()]),
+                        Term::func("comp", vec![b.clone()]),
+                    ],
+                ),
+            ),
+        );
+        lib.add_rule(
+            "de_morgan_union",
+            Equality::new(
+                Term::func(
+                    "comp",
+                    vec![Term::func("union", vec![a.clone(), b.clone()])],
+                ),
+                Term::func(
+                    "inter",
+                    vec![
+                        Term::func("comp", vec![a.clone()]),
+                        Term::func("comp", vec![b.clone()]),
+                    ],
+                ),
+            ),
+        );
 
         lib
     }
@@ -356,7 +581,10 @@ impl FormalVerifier {
                 if target_goal.equality.lhs == target_goal.equality.rhs {
                     next_state.proof_history.push((
                         Tactic::Reflexivity,
-                        format!("Solved #{}: {} via rfl", target_goal.id, target_goal.equality),
+                        format!(
+                            "Solved #{}: {} via rfl",
+                            target_goal.id, target_goal.equality
+                        ),
                     ));
                     next_state.check_solved();
                     Ok(next_state)
@@ -373,10 +601,9 @@ impl FormalVerifier {
                         equality: flipped.clone(),
                     },
                 );
-                next_state.proof_history.push((
-                    Tactic::Symmetry,
-                    format!("Applied symm: {}", flipped),
-                ));
+                next_state
+                    .proof_history
+                    .push((Tactic::Symmetry, format!("Applied symm: {}", flipped)));
                 next_state.depth += 1;
                 Ok(next_state)
             }
@@ -433,7 +660,9 @@ impl FormalVerifier {
                 }
             }
             Tactic::Transitivity(_) => Err("Transitivity unsupported in minimal verifier"),
-            Tactic::ApplyAxiom(_) => Err("Direct axiom application unsupported in minimal verifier"),
+            Tactic::ApplyAxiom(_) => {
+                Err("Direct axiom application unsupported in minimal verifier")
+            }
         }
     }
 
@@ -451,7 +680,13 @@ impl FormalVerifier {
         }
 
         // 2. Try Symmetry (if not applied immediately before)
-        if !state.proof_history.iter().rev().take(1).any(|(t, _)| matches!(t, Tactic::Symmetry)) {
+        if !state
+            .proof_history
+            .iter()
+            .rev()
+            .take(1)
+            .any(|(t, _)| matches!(t, Tactic::Symmetry))
+        {
             if let Ok(next) = Self::apply_tactic(state, &Tactic::Symmetry, axioms) {
                 successors.push((Tactic::Symmetry, next));
             }
@@ -541,7 +776,10 @@ mod tests {
         )
         .expect("Step 2 valid");
 
-        assert!(step2.is_solved, "Proof must be certified complete upon reaching reflexivity");
+        assert!(
+            step2.is_solved,
+            "Proof must be certified complete upon reaching reflexivity"
+        );
         assert_eq!(step2.proof_history.len(), 2);
     }
 }

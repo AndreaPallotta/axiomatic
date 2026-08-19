@@ -92,15 +92,27 @@ impl DeepProofNetwork {
     pub fn forward(&self, x: &[f64]) -> (Vec<f64>, Vec<f64>, Vec<f64>, f64) {
         // Layer 1: h1 = GELU(W1 * x + b1)
         let z1 = self.w1.dot_vec(x);
-        let h1: Vec<f64> = z1.iter().zip(&self.b1).map(|(&z, &b)| Self::gelu(z + b)).collect();
+        let h1: Vec<f64> = z1
+            .iter()
+            .zip(&self.b1)
+            .map(|(&z, &b)| Self::gelu(z + b))
+            .collect();
 
         // Layer 2: h2 = GELU(W2 * h1 + b2)
         let z2 = self.w2.dot_vec(&h1);
-        let h2: Vec<f64> = z2.iter().zip(&self.b2).map(|(&z, &b)| Self::gelu(z + b)).collect();
+        let h2: Vec<f64> = z2
+            .iter()
+            .zip(&self.b2)
+            .map(|(&z, &b)| Self::gelu(z + b))
+            .collect();
 
         // Policy Head: logits = W_p * h2 + b_p
         let z_p = self.w_policy.dot_vec(&h2);
-        let policy_logits: Vec<f64> = z_p.iter().zip(&self.b_policy).map(|(&z, &b)| z + b).collect();
+        let policy_logits: Vec<f64> = z_p
+            .iter()
+            .zip(&self.b_policy)
+            .map(|(&z, &b)| z + b)
+            .collect();
 
         // Value Head: v = tanh(W_v * h2 + b_v)
         let z_v = self.w_value.dot_vec(&h2);
@@ -123,11 +135,19 @@ impl DeepProofNetwork {
             Tactic::Reflexivity => 0,
             Tactic::Symmetry => 1,
             Tactic::RewriteLhs(rule_name) => {
-                let idx = axioms.rules.iter().position(|(n, _)| n == rule_name).unwrap_or(0);
+                let idx = axioms
+                    .rules
+                    .iter()
+                    .position(|(n, _)| n == rule_name)
+                    .unwrap_or(0);
                 2 + (idx % 12)
             }
             Tactic::RewriteRhs(rule_name) => {
-                let idx = axioms.rules.iter().position(|(n, _)| n == rule_name).unwrap_or(0);
+                let idx = axioms
+                    .rules
+                    .iter()
+                    .position(|(n, _)| n == rule_name)
+                    .unwrap_or(0);
                 14 + (idx % 12)
             }
             _ => 0,
@@ -169,7 +189,11 @@ impl NeuralPolicy for DeepNeuralPolicy {
             };
         }
 
-        let prev_size = state.open_goals.first().map(|g| g.equality.lhs.size() + g.equality.rhs.size()).unwrap_or(10);
+        let prev_size = state
+            .open_goals
+            .first()
+            .map(|g| g.equality.lhs.size() + g.equality.rhs.size())
+            .unwrap_or(10);
 
         // Map model probabilities to valid tactics with heuristic simplification guidance
         let mut unnorm_priors = Vec::new();
@@ -177,7 +201,11 @@ impl NeuralPolicy for DeepNeuralPolicy {
             let class_idx = DeepProofNetwork::tactic_to_index(tactic, axioms);
             let mut p = probs[class_idx.min(probs.len() - 1)].max(0.01);
 
-            let next_size = next_st.open_goals.first().map(|g| g.equality.lhs.size() + g.equality.rhs.size()).unwrap_or(10);
+            let next_size = next_st
+                .open_goals
+                .first()
+                .map(|g| g.equality.lhs.size() + g.equality.rhs.size())
+                .unwrap_or(10);
             if next_st.is_solved {
                 p *= 20.0;
             } else if next_size < prev_size {
@@ -246,7 +274,10 @@ impl ModelCheckpoint {
             println!("[INFO] Loaded existing model checkpoint from {}", best_path);
             (ckpt.model, ckpt.total_epochs_trained, ckpt.best_loss)
         } else if let Ok(ckpt) = Self::load_from_file(&latest_path) {
-            println!("[INFO] Loaded existing model checkpoint from {}", latest_path);
+            println!(
+                "[INFO] Loaded existing model checkpoint from {}",
+                latest_path
+            );
             (ckpt.model, ckpt.total_epochs_trained, ckpt.best_loss)
         } else if let Ok(ckpt) = serde_json::from_str::<ModelCheckpoint>(EMBEDDED_BASELINE_MODEL) {
             println!("[INFO] Initialized from embedded pretrained baseline weights");
@@ -287,6 +318,9 @@ mod tests {
     #[test]
     fn test_embedded_baseline_model_deserialization() {
         let ckpt: Result<ModelCheckpoint, _> = serde_json::from_str(EMBEDDED_BASELINE_MODEL);
-        assert!(ckpt.is_ok(), "Embedded baseline checkpoint must deserialize cleanly");
+        assert!(
+            ckpt.is_ok(),
+            "Embedded baseline checkpoint must deserialize cleanly"
+        );
     }
 }

@@ -54,7 +54,11 @@ impl MathematicalVectorDB {
     pub fn insert(&mut self, vector: Vec<f64>, payload: TheoremPayload) -> usize {
         assert_eq!(vector.len(), self.dimension, "Vector dimension mismatch");
         let id = self.records.len();
-        self.records.push(VectorRecord { id, vector, payload });
+        self.records.push(VectorRecord {
+            id,
+            vector,
+            payload,
+        });
         id
     }
 
@@ -81,7 +85,11 @@ impl MathematicalVectorDB {
             .collect();
 
         // Sort descending by similarity score
-        scored.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        scored.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         scored.truncate(top_k);
         scored
     }
@@ -121,7 +129,11 @@ pub fn dot_product(a: &[f64], b: &[f64]) -> f64 {
 }
 
 pub fn euclidean_distance(a: &[f64], b: &[f64]) -> f64 {
-    a.iter().zip(b).map(|(x, y)| (x - y).powi(2)).sum::<f64>().sqrt()
+    a.iter()
+        .zip(b)
+        .map(|(x, y)| (x - y).powi(2))
+        .sum::<f64>()
+        .sqrt()
 }
 
 #[cfg(test)]

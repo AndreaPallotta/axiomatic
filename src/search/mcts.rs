@@ -9,9 +9,21 @@ use tokio::sync::broadcast;
 pub enum SearchEvent {
     TreeReset(SearchGraphSnapshot),
     NodeCreated(MctsNode),
-    NodeVisited { id: usize, visits: usize, mean_value: f64 },
-    ProofDiscovered { node_id: usize, depth: usize, tactics_count: usize },
-    SearchStepCompleted { iteration: usize, total_nodes: usize, best_value: f64 },
+    NodeVisited {
+        id: usize,
+        visits: usize,
+        mean_value: f64,
+    },
+    ProofDiscovered {
+        node_id: usize,
+        depth: usize,
+        tactics_count: usize,
+    },
+    SearchStepCompleted {
+        iteration: usize,
+        total_nodes: usize,
+        best_value: f64,
+    },
 }
 
 /// Snapshot of the complete search graph for live D3 / Canvas rendering
@@ -190,11 +202,7 @@ impl MctsEngine {
     }
 
     /// Executes one full MCTS iteration (Select -> Expand/Eval -> Backpropagate)
-    pub fn step(
-        &mut self,
-        policy: &dyn NeuralPolicy,
-        axioms: &AxiomLibrary,
-    ) -> Option<usize> {
+    pub fn step(&mut self, policy: &dyn NeuralPolicy, axioms: &AxiomLibrary) -> Option<usize> {
         self.iterations += 1;
         let leaf_id = self.select_leaf();
         let value = self.expand_and_evaluate(leaf_id, policy, axioms);
@@ -277,10 +285,10 @@ mod tests {
         let zero = Term::constant("0");
         let one = Term::constant("1");
         let goal_eq = Equality::new(
-            Term::func("*", vec![
-                Term::func("+", vec![x.clone(), zero.clone()]),
-                one.clone(),
-            ]),
+            Term::func(
+                "*",
+                vec![Term::func("+", vec![x.clone(), zero.clone()]), one.clone()],
+            ),
             Term::func("*", vec![one.clone(), x.clone()]),
         );
 
@@ -288,7 +296,10 @@ mod tests {
         let mut mcts = MctsEngine::new(initial_state, 6);
 
         let proof = mcts.run_search(&policy, &axioms, 150);
-        assert!(proof.is_some(), "MCTS must autonomously prove multi-step goal");
+        assert!(
+            proof.is_some(),
+            "MCTS must autonomously prove multi-step goal"
+        );
         let solved = proof.unwrap();
         assert!(solved.is_solved, "Proof must be verified complete");
     }

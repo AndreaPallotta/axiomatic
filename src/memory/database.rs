@@ -26,12 +26,7 @@ impl LemmaDatabase {
     }
 
     /// Registers a newly discovered and verified theorem
-    pub fn record_theorem(
-        &mut self,
-        name: &str,
-        statement: Equality,
-        proof_state: ProofState,
-    ) {
+    pub fn record_theorem(&mut self, name: &str, statement: Equality, proof_state: ProofState) {
         let entry = VerifiedTheorem {
             name: name.to_string(),
             statement,

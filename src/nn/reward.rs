@@ -34,11 +34,7 @@ impl RewardEngine {
     }
 
     /// Evaluates a trajectory of states and returns the target return z_t for each step
-    pub fn compute_trajectory_returns(
-        &self,
-        states: &[ProofState],
-        is_proven: bool,
-    ) -> Vec<f64> {
+    pub fn compute_trajectory_returns(&self, states: &[ProofState], is_proven: bool) -> Vec<f64> {
         let n = states.len();
         if n == 0 {
             return Vec::new();
@@ -51,7 +47,8 @@ impl RewardEngine {
             let next_size = Self::state_ast_size(&states[i + 1]);
 
             // Reward AST reductions (simplifications)
-            let simplification_delta = (prev_size as f64 - next_size as f64) * self.config.simplification_weight;
+            let simplification_delta =
+                (prev_size as f64 - next_size as f64) * self.config.simplification_weight;
             step_rewards[i] = simplification_delta;
         }
 
@@ -115,6 +112,9 @@ mod tests {
 
         let returns = engine.compute_trajectory_returns(&[s0, s1], true);
         assert_eq!(returns.len(), 2);
-        assert!(returns[0] > 0.5, "Return must be positive for successful proof");
+        assert!(
+            returns[0] > 0.5,
+            "Return must be positive for successful proof"
+        );
     }
 }

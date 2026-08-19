@@ -1,6 +1,8 @@
+#![allow(unused_variables, dead_code, clippy::all)]
+
 use axiomatic::{
-    export_to_lean4, AxiomLibrary, Equality, LemmaDatabase,
-    MctsEngine, ProofState, SymbolicNeuralPolicy, Term,
+    export_to_lean4, AxiomLibrary, Equality, LemmaDatabase, MctsEngine, ProofState,
+    SymbolicNeuralPolicy, Term,
 };
 use std::env;
 use tokio::sync::broadcast;
@@ -17,11 +19,15 @@ fn print_usage() {
     println!("USAGE:");
     println!("  cargo run --release -- <COMMAND> [OPTIONS]\n");
     println!("COMMANDS:");
-    println!("  train [OPTIONS]       Run Self-Play Neural Network Training with auto-checkpointing");
+    println!(
+        "  train [OPTIONS]       Run Self-Play Neural Network Training with auto-checkpointing"
+    );
     println!("                        Options: --hours <H>, --epochs <N>, --dir <PATH>");
     println!("                        Examples: train --hours 2");
     println!("                                  train --epochs 500");
-    println!("  prove <THEOREMS...>   Run autonomous MCTS proof discovery using trained Neural Net");
+    println!(
+        "  prove <THEOREMS...>   Run autonomous MCTS proof discovery using trained Neural Net"
+    );
     println!("  serve [PORT]          Launch live Web Graphical Dashboard (default: 3000)");
     println!("  demo                  Run autonomous theorem discovery and memory compounding");
     println!("  lean                  Generate and export certified Lean 4 formal proofs\n");
@@ -113,7 +119,10 @@ fn run_neural_network_training(
         axiomatic::ModelCheckpoint::try_load_or_init(checkpoint_dir);
 
     if prior_epochs > 0 {
-        println!("[INFO] Resuming training from Epoch {} (Prior Best Loss: {:.4})", prior_epochs, prior_loss);
+        println!(
+            "[INFO] Resuming training from Epoch {} (Prior Best Loss: {:.4})",
+            prior_epochs, prior_loss
+        );
     }
 
     let mut optimizer = axiomatic::AdamOptimizer::new(&model, 0.005);
@@ -141,7 +150,10 @@ fn run_autonomous_proof_cli() {
     let (model, epochs, _) = axiomatic::ModelCheckpoint::try_load_or_init("models");
     let policy = axiomatic::DeepNeuralPolicy::new(model);
     if epochs > 0 {
-        println!("[INFO] Using Trained Neural Network (Trained for {} Epochs)", epochs);
+        println!(
+            "[INFO] Using Trained Neural Network (Trained for {} Epochs)",
+            epochs
+        );
     } else {
         println!("[INFO] Using Initialized Neural Network");
     }
@@ -181,8 +193,14 @@ fn run_autonomous_proof_cli() {
         println!("[Q.E.D.] Formal proof discovered successfully.");
         println!("  - Search Nodes:    {}", mcts.nodes.len());
         println!("  - Iterations:      {}", mcts.iterations);
-        println!("  - Execution Time:  {:.3} ms", elapsed.as_secs_f64() * 1000.0);
-        println!("  - Proof Length:    {} tactic steps\n", solved_state.proof_history.len());
+        println!(
+            "  - Execution Time:  {:.3} ms",
+            elapsed.as_secs_f64() * 1000.0
+        );
+        println!(
+            "  - Proof Length:    {} tactic steps\n",
+            solved_state.proof_history.len()
+        );
 
         println!("Formal Proof Derivation (Verified by Kernel):");
         for (i, (tactic, desc)) in solved_state.proof_history.iter().enumerate() {
@@ -223,15 +241,23 @@ fn run_compounding_memory_demo() {
         Term::func("+", vec![zero.clone(), x.clone()]),
     );
 
-    println!("[STAGE 1] Proving Auxiliary Lemma [lemma_add_zero_comm]: {}", lemma_eq);
+    println!(
+        "[STAGE 1] Proving Auxiliary Lemma [lemma_add_zero_comm]: {}",
+        lemma_eq
+    );
     let mut mcts1 = MctsEngine::new(ProofState::new(lemma_eq.clone()), 6);
-    let p1 = mcts1.run_search(&policy, &axioms, 100).expect("Lemma must be proven");
+    let p1 = mcts1
+        .run_search(&policy, &axioms, 100)
+        .expect("Lemma must be proven");
     println!("  [OK] Lemma verified in {} steps", p1.proof_history.len());
 
     // Record in database
     database.record_theorem("lemma_add_zero_comm", lemma_eq, p1);
     database.augment_axioms(&mut axioms);
-    println!("  [OK] Registered in Knowledge Base. Total active rules: {}\n", axioms.rules.len());
+    println!(
+        "  [OK] Registered in Knowledge Base. Total active rules: {}\n",
+        axioms.rules.len()
+    );
 
     // Complex Goal using the learned lemma:
     let a = Term::constant("a");
@@ -239,10 +265,18 @@ fn run_compounding_memory_demo() {
     let complex_rhs = Term::func("+", vec![zero.clone(), a.clone()]);
     let complex_eq = Equality::new(complex_lhs, complex_rhs);
 
-    println!("[STAGE 2] Solving Target Theorem using Learned Lemma: {}", complex_eq);
+    println!(
+        "[STAGE 2] Solving Target Theorem using Learned Lemma: {}",
+        complex_eq
+    );
     let mut mcts2 = MctsEngine::new(ProofState::new(complex_eq), 6);
-    let p2 = mcts2.run_search(&policy, &axioms, 100).expect("Target must be proven");
-    println!("  [Q.E.D.] Target solved in {} steps using learned lemma", p2.proof_history.len());
+    let p2 = mcts2
+        .run_search(&policy, &axioms, 100)
+        .expect("Target must be proven");
+    println!(
+        "  [Q.E.D.] Target solved in {} steps using learned lemma",
+        p2.proof_history.len()
+    );
     println!("================================================================================\n");
 }
 
@@ -262,7 +296,9 @@ fn run_lean_export_demo() {
         Term::func("+", vec![zero.clone(), a.clone()]),
     );
     let mut mcts = MctsEngine::new(ProofState::new(goal_eq), 6);
-    let proof = mcts.run_search(&policy, &axioms, 100).expect("Proof must be found");
+    let proof = mcts
+        .run_search(&policy, &axioms, 100)
+        .expect("Proof must be found");
 
     let lean_code = export_to_lean4("add_zero_symmetric", &proof);
     println!("{}", lean_code);

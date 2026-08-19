@@ -136,8 +136,13 @@ pub fn collect_self_play_trajectory(
 
                 // Compute RL Return via Bellman equation
                 let trajectory_states = vec![node.state.clone()];
-                let computed_returns = reward_engine.compute_trajectory_returns(&trajectory_states, is_proven);
-                let target_return = computed_returns.first().copied().unwrap_or(if is_proven { 1.0 } else { -0.5 });
+                let computed_returns =
+                    reward_engine.compute_trajectory_returns(&trajectory_states, is_proven);
+                let target_return =
+                    computed_returns
+                        .first()
+                        .copied()
+                        .unwrap_or(if is_proven { 1.0 } else { -0.5 });
 
                 samples.push(TrainingSample {
                     x,
@@ -152,14 +157,22 @@ pub fn collect_self_play_trajectory(
 }
 
 /// Converts an existing MCTS tree into training samples for immediate reinforcement learning
-pub fn convert_mcts_tree_to_training_samples(mcts: &MctsEngine, axioms: &AxiomLibrary, is_proven: bool) -> Vec<TrainingSample> {
+pub fn convert_mcts_tree_to_training_samples(
+    mcts: &MctsEngine,
+    axioms: &AxiomLibrary,
+    is_proven: bool,
+) -> Vec<TrainingSample> {
     let reward_engine = super::reward::RewardEngine::new(super::reward::RewardConfig::default());
     let mut samples = Vec::new();
 
     for node in &mcts.nodes {
         if node.visit_count > 0 && node.is_expanded && !node.children_ids.is_empty() {
             let x = vectorize_proof_state(&node.state);
-            let total_visits: usize = node.children_ids.iter().map(|&cid| mcts.nodes[cid].visit_count).sum();
+            let total_visits: usize = node
+                .children_ids
+                .iter()
+                .map(|&cid| mcts.nodes[cid].visit_count)
+                .sum();
 
             if total_visits > 0 {
                 let mut target_pi = vec![0.0; NUM_TACTIC_CLASSES];
@@ -173,8 +186,13 @@ pub fn convert_mcts_tree_to_training_samples(mcts: &MctsEngine, axioms: &AxiomLi
                 }
 
                 let trajectory_states = vec![node.state.clone()];
-                let computed_returns = reward_engine.compute_trajectory_returns(&trajectory_states, is_proven);
-                let target_return = computed_returns.first().copied().unwrap_or(if is_proven { 1.0 } else { -0.5 });
+                let computed_returns =
+                    reward_engine.compute_trajectory_returns(&trajectory_states, is_proven);
+                let target_return =
+                    computed_returns
+                        .first()
+                        .copied()
+                        .unwrap_or(if is_proven { 1.0 } else { -0.5 });
 
                 samples.push(TrainingSample {
                     x,
@@ -287,13 +305,18 @@ pub fn train_continuous_session(
     println!("[INFO] Starting Continuous Neural Training Session");
     println!("  - Checkpoint Dir: {}", checkpoint_dir);
     if let Some(secs) = target_duration_secs {
-        println!("  - Target Duration: {:.1} hours ({} seconds)", secs as f64 / 3600.0, secs);
+        println!(
+            "  - Target Duration: {:.1} hours ({} seconds)",
+            secs as f64 / 3600.0,
+            secs
+        );
     }
     if let Some(ep) = target_epochs {
         println!("  - Target Epochs:   {}", ep);
     }
     println!("================================================================================================================");
-    println!(" {:>6} | {:>10} | {:>12} | {:>12} | {:>12} | {:>12} | {:>16}",
+    println!(
+        " {:>6} | {:>10} | {:>12} | {:>12} | {:>12} | {:>12} | {:>16}",
         "Epoch", "Elapsed", "Total Loss", "Policy CE", "Value MSE", "Solve Rate", "Best Checkpoint"
     );
     println!("----------------------------------------------------------------------------------------------------------------");
@@ -321,7 +344,12 @@ pub fn train_continuous_session(
 
         let solve_rate = (solved_this_epoch as f64 / games_per_epoch as f64) * 100.0;
         let elapsed_secs = start_time.elapsed().as_secs();
-        let elapsed_str = format!("{:02}:{:02}:{:02}", elapsed_secs / 3600, (elapsed_secs % 3600) / 60, elapsed_secs % 60);
+        let elapsed_str = format!(
+            "{:02}:{:02}:{:02}",
+            elapsed_secs / 3600,
+            (elapsed_secs % 3600) / 60,
+            elapsed_secs % 60
+        );
 
         let mut saved_label = "-";
 
@@ -344,7 +372,8 @@ pub fn train_continuous_session(
 
         // Print progress every epoch or periodically
         if epoch % 5 == 0 || epoch == 1 || saved_label == "saved best" {
-            println!(" {:>6} | {:>10} | {:>12.4} | {:>12.4} | {:>12.4} | {:>11.1}% | {:>16}",
+            println!(
+                " {:>6} | {:>10} | {:>12.4} | {:>12.4} | {:>12.4} | {:>11.1}% | {:>16}",
                 epoch, elapsed_str, total_loss, pol_loss, val_loss, solve_rate, saved_label
             );
         }
@@ -352,7 +381,10 @@ pub fn train_continuous_session(
         // Check stopping criteria
         if let Some(max_s) = target_duration_secs {
             if elapsed_secs >= max_s {
-                println!("[INFO] Target duration reached ({:.1}s). Ending session.", elapsed_secs);
+                println!(
+                    "[INFO] Target duration reached ({:.1}s). Ending session.",
+                    elapsed_secs
+                );
                 break;
             }
         }
@@ -368,9 +400,18 @@ pub fn train_continuous_session(
     let final_ckpt = ModelCheckpoint::new(model.clone(), epoch, best_loss, total_solved);
     let _ = final_ckpt.save_to_file(&format!("{}/checkpoint_latest.json", checkpoint_dir));
     println!("================================================================================================================");
-    println!("[OK] Continuous Training Complete. Total Epochs: {}, Total Theorems Solved: {}", epoch, total_solved);
-    println!("  - Best Model saved to:   {}/checkpoint_best.json (Loss: {:.4})", checkpoint_dir, best_loss);
-    println!("  - Latest Model saved to: {}/checkpoint_latest.json", checkpoint_dir);
+    println!(
+        "[OK] Continuous Training Complete. Total Epochs: {}, Total Theorems Solved: {}",
+        epoch, total_solved
+    );
+    println!(
+        "  - Best Model saved to:   {}/checkpoint_best.json (Loss: {:.4})",
+        checkpoint_dir, best_loss
+    );
+    println!(
+        "  - Latest Model saved to: {}/checkpoint_latest.json",
+        checkpoint_dir
+    );
     println!("================================================================================================================\n");
 
     (model.clone(), epoch, best_loss)

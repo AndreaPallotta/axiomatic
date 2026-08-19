@@ -8,7 +8,12 @@ pub fn term_to_lean(term: &Term) -> String {
         Term::Const(name) => name.clone(),
         Term::Func(name, args) => {
             if args.len() == 2 && (name == "+" || name == "*" || name == "·" || name == "^") {
-                format!("({} {} {})", term_to_lean(&args[0]), name, term_to_lean(&args[1]))
+                format!(
+                    "({} {} {})",
+                    term_to_lean(&args[0]),
+                    name,
+                    term_to_lean(&args[1])
+                )
             } else if args.len() == 1 && name == "-" {
                 format!("(-{})", term_to_lean(&args[0]))
             } else {
@@ -24,7 +29,10 @@ pub fn export_to_lean4(theorem_name: &str, final_state: &ProofState) -> String {
     let mut code = String::new();
 
     code.push_str("-- ========================================================\n");
-    code.push_str(&format!("-- AXIOMATIC AUTONOMOUS THEOREM DISCOVERY: {}\n", theorem_name));
+    code.push_str(&format!(
+        "-- AXIOMATIC AUTONOMOUS THEOREM DISCOVERY: {}\n",
+        theorem_name
+    ));
     code.push_str("-- Machine-certified proof synthesized via MCTS & Neurosymbolic Kernel\n");
     code.push_str("-- ========================================================\n\n");
 
@@ -36,7 +44,10 @@ pub fn export_to_lean4(theorem_name: &str, final_state: &ProofState) -> String {
         code.push_str(&format!("-- Initial Goal: {}\n", first_step_desc));
     }
 
-    code.push_str(&format!("theorem {} (α : Type*) [CommRing α] (x y z a b : α) :\n", theorem_name));
+    code.push_str(&format!(
+        "theorem {} (α : Type*) [CommRing α] (x y z a b : α) :\n",
+        theorem_name
+    ));
 
     // Tactics body
     code.push_str("  sorry := by\n");
