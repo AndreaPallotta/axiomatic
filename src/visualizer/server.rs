@@ -1471,24 +1471,24 @@ pub const DASHBOARD_HTML: &str = r#"<!DOCTYPE html>
         <div class="canvas-card">
             <!-- Canvas Controls Sub-Toolbar -->
             <div class="sub-toolbar">
-                <div class="toolbar-group" style="flex:1; min-width:280px;">
+                <div class="toolbar-group" style="display:flex; align-items:center; gap:6px; flex:1; min-width:340px;">
                     <span style="font-size:0.72rem; font-weight:700; color:var(--md-text-secondary);">GOAL:</span>
-                    <input type="text" id="goal-input" value="((x + -(x)) + (y * 1)) = (0 + y)" style="flex:1; padding:4px 8px; border-radius:12px; border:1px solid var(--md-border); font-family:'Roboto Mono', monospace; font-size:0.75rem; outline:none;">
-                    <button class="btn btn-tonal btn-sm" onclick="setGoalFromInput()">Set Goal</button>
+                    <input type="text" id="goal-input" value="((x + -(x)) + (y * 1)) = (0 + y)" style="flex:1; max-width:240px; padding:4px 8px; border-radius:6px; border:1px solid var(--md-border); font-family:'Roboto Mono', monospace; font-size:0.75rem; outline:none;">
+                    <button class="btn btn-tonal btn-sm" onclick="setGoalFromInput()">Set</button>
                     <button class="btn btn-filled btn-sm" onclick="stepMcts(15)">Step +15</button>
-                    <button class="btn btn-tonal btn-sm" onclick="applyInduction()">Induction</button>
+                    <button class="btn btn-tonal btn-sm" onclick="applyInduction()">Induct</button>
                     <button class="btn btn-tonal btn-sm" onclick="nextGoal()">Next</button>
                 </div>
 
-                <div class="toolbar-group" style="border-left:1px solid var(--md-border); padding-left:6px;">
-                    <label style="display:flex; align-items:center; gap:4px; font-size:0.72rem; color:var(--md-text-secondary); cursor:pointer; margin-right:4px;">
+                <div class="toolbar-group" style="display:flex; align-items:center; gap:5px; border-left:1px solid var(--md-border); padding-left:8px;">
+                    <label style="display:flex; align-items:center; gap:4px; font-size:0.72rem; color:var(--md-text-secondary); cursor:pointer; margin-right:2px;">
                         <input type="checkbox" id="chk-autofollow" checked style="cursor:pointer;">
-                        <span>Live Follow</span>
+                        <span>Live</span>
                     </label>
-                    <button id="btn-filt-proven" class="btn btn-tonal btn-sm" onclick="setTreeFilter('proven')" style="font-weight:600; background:#e6f4ea; color:#137333;">Proven Path</button>
-                    <button id="btn-filt-visited" class="btn btn-tonal btn-sm" onclick="setTreeFilter('visited')">Visited (N>0)</button>
-                    <button id="btn-filt-all" class="btn btn-tonal btn-sm" onclick="setTreeFilter('all')">All Nodes</button>
-                    <button class="btn btn-tonal btn-sm" onclick="fitTreeToCanvas()">Fit & Center</button>
+                    <button id="btn-filt-proven" class="btn btn-tonal btn-sm" onclick="setTreeFilter('proven')" style="font-weight:600; background:#e6f4ea; color:#137333;">Proven</button>
+                    <button id="btn-filt-visited" class="btn btn-tonal btn-sm" onclick="setTreeFilter('visited')">Visited</button>
+                    <button id="btn-filt-all" class="btn btn-tonal btn-sm" onclick="setTreeFilter('all')">All</button>
+                    <button class="btn btn-tonal btn-sm" onclick="fitTreeToCanvas()">Fit</button>
                     <button class="btn btn-tonal btn-sm" onclick="zoomIn()">+</button>
                     <button class="btn btn-tonal btn-sm" onclick="zoomOut()">-</button>
                     <button class="btn btn-tonal btn-sm" onclick="exportProof('lean4')">Lean 4</button>

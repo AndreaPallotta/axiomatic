@@ -2,6 +2,8 @@
 
 > Autonomous Neurosymbolic Mathematical Discovery Engine with Real-Time Interactive Command Center.
 
+![Axiomatic Command Center](docs/screenshots/cockpit_live.png)
+
 Axiomatic is a high-performance mathematical reasoning system written in Rust. It pairs formal first-order logic verification and structural Peano induction with deep neural Monte Carlo Tree Search (MCTS), closed-loop self-play reinforcement learning, vector premise retrieval, and formal proof certification (Lean 4, Coq, LaTeX).
 
 ---
