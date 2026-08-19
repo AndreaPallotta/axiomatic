@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  axiomatic:
+    build: .
+    container_name: axiomatic-engine
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./models:/app/models
+    restart: unless-stopped
