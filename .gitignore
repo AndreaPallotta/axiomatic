@@ -6,3 +6,4 @@ Thumbs.db
 .vscode/
 .idea/
 models/*.tmp
+node_modules/

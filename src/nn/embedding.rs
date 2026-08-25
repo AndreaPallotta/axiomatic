@@ -1,10 +1,29 @@
+use super::gnn::SparseGraphAttentionNetwork;
 use crate::verifier::fol::Term;
 use crate::verifier::kernel::ProofState;
 
 /// Dimension of the mathematical feature embedding vector
 pub const EMBEDDING_DIM: usize = 32;
 
-/// Vectorizes a ProofState and its AST expressions into a fixed-size float vector
+/// Vectorizes a ProofState and its AST expressions using the Unified Master Mathematical Graph
+pub fn graph_vectorize_proof_state(gnn: &SparseGraphAttentionNetwork, state: &ProofState) -> Vec<f64> {
+    if state.is_solved || state.open_goals.is_empty() {
+        let mut vec = vec![0.0; EMBEDDING_DIM];
+        vec[0] = 1.0;
+        return vec;
+    }
+
+    let (mut pooled, _) = gnn.forward_active_subgraph(state);
+
+    // Blend high-level structural invariant metadata
+    pooled[0] = 0.0; // Solved indicator
+    pooled[1] = (state.depth as f64) / 10.0; // Depth
+    pooled[2] = (state.open_goals.len() as f64) / 5.0; // Open goals count
+
+    pooled
+}
+
+/// Vectorizes a ProofState and its AST expressions into a fixed-size float vector (legacy fast fallback)
 pub fn vectorize_proof_state(state: &ProofState) -> Vec<f64> {
     let mut vec = vec![0.0; EMBEDDING_DIM];
 
@@ -118,5 +137,17 @@ mod tests {
         let vec = vectorize_proof_state(&state);
         assert_eq!(vec.len(), EMBEDDING_DIM);
         assert!(vec.iter().any(|&v| v > 0.0));
+    }
+
+    #[test]
+    fn test_graph_vectorize_state_shape() {
+        let gnn = SparseGraphAttentionNetwork::new(16);
+        let x = Term::var("x");
+        let zero = Term::constant("0");
+        let state = ProofState::new(Equality::new(x, zero));
+
+        let vec = graph_vectorize_proof_state(&gnn, &state);
+        assert_eq!(vec.len(), EMBEDDING_DIM);
+        assert!(vec.iter().any(|&v| v.abs() > 0.0));
     }
 }

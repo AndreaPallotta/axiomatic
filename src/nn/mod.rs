@@ -1,11 +1,15 @@
 pub mod embedding;
+pub mod gnn;
+pub mod graph;
 pub mod model;
 pub mod optim;
 pub mod reward;
 pub mod supervisor;
 pub mod trainer;
 
-pub use embedding::{vectorize_proof_state, EMBEDDING_DIM};
+pub use embedding::{graph_vectorize_proof_state, vectorize_proof_state, EMBEDDING_DIM};
+pub use gnn::SparseGraphAttentionNetwork;
+pub use graph::{EdgeType, MasterMathGraph, MathGraphEdge, MathGraphNode, NodeType};
 pub use model::{DeepNeuralPolicy, DeepProofNetwork, Matrix, ModelCheckpoint, NUM_TACTIC_CLASSES};
 pub use optim::{AdamOptimizer, TrainingSample};
 pub use reward::{RewardConfig, RewardEngine};
