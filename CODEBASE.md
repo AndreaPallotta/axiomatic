@@ -1,6 +1,6 @@
 ﻿# Codebase Map
-Generated: 2026-09-07 18:41:18
-Commit: 5b276f6 feat(gnn): implement unified master mathematical graph with sparse attention routing (v0.2.0)
+Generated: 2026-09-07 19:41:48
+Commit: c5e0ab2 feat(verifier): integrate Lean 4 kernel verification and proof artifact emission
 
 This file is a compact index of the codebase for AI agents to understand project structure without full recursive file scans.
 
@@ -13,7 +13,7 @@ See [DEPS.md](file:///c:/Users/andre/OneDrive/Desktop/projects/agent-devkit/DEPS
 - **AGENT.md** (33 lines)
 - **CHANGELOG.md** (33 lines)
 - **CLAUDE.md** (30 lines)
-- **CODEBASE.md** (188 lines)
+- **CODEBASE.md** (190 lines)
 - **DECISIONS.md** (31 lines)
 - **DEPS.md** (30 lines)
 - **docker-compose.yml** (12 lines)
@@ -27,8 +27,8 @@ See [DEPS.md](file:///c:/Users/andre/OneDrive/Desktop/projects/agent-devkit/DEPS
 - **src/generator/policy.rs** (133 lines)
 - **src/generator/prompt.rs** (22 lines)
 - **src/lib.rs** (30 lines)
-- **src/main.rs** (389 lines)
-- **src/memory/database.rs** (68 lines)
+- **src/main.rs** (410 lines)
+- **src/memory/database.rs** (130 lines)
 - **src/memory/mod.rs** (8 lines)
 - **src/memory/vectordb.rs** (177 lines)
 - **src/nn/embedding.rs** (154 lines)
@@ -40,7 +40,7 @@ See [DEPS.md](file:///c:/Users/andre/OneDrive/Desktop/projects/agent-devkit/DEPS
 - **src/nn/reward.rs** (121 lines)
 - **src/nn/supervisor.rs** (285 lines)
 - **src/nn/trainer.rs** (436 lines)
-- **src/search/mcts.rs** (307 lines)
+- **src/search/mcts.rs** (311 lines)
 - **src/search/mod.rs** (6 lines)
 - **src/search/node.rs** (83 lines)
 - **src/theory/curriculum.rs** (255 lines)
@@ -50,9 +50,9 @@ See [DEPS.md](file:///c:/Users/andre/OneDrive/Desktop/projects/agent-devkit/DEPS
 - **src/verifier/exporter.rs** (136 lines)
 - **src/verifier/fol.rs** (277 lines)
 - **src/verifier/induction.rs** (94 lines)
-- **src/verifier/kernel.rs** (789 lines)
-- **src/verifier/lean.rs** (233 lines)
-- **src/verifier/lean_runner.rs** (217 lines)
+- **src/verifier/kernel.rs** (876 lines)
+- **src/verifier/lean.rs** (339 lines)
+- **src/verifier/lean_runner.rs** (249 lines)
 - **src/verifier/mod.rs** (16 lines)
 - **src/verifier/parser.rs** (287 lines)
 - **src/visualizer/mod.rs** (4 lines)
@@ -74,8 +74,8 @@ See [DEPS.md](file:///c:/Users/andre/OneDrive/Desktop/projects/agent-devkit/DEPS
 - pub fn format_proof_prompt(state: &ProofState) -> String { [L4]
 
 ### src/memory/database.rs
-- pub struct VerifiedTheorem { [L7]
-- pub struct LemmaDatabase { [L17]
+- pub struct VerifiedTheorem { [L8]
+- pub struct LemmaDatabase { [L20]
 
 ### src/memory/vectordb.rs
 - pub enum DistanceMetric { [L5]
@@ -166,15 +166,17 @@ See [DEPS.md](file:///c:/Users/andre/OneDrive/Desktop/projects/agent-devkit/DEPS
 - pub enum Tactic { [L7]
 - pub struct Goal { [L31]
 - pub struct ProofState { [L44]
-- pub enum MathDomain { [L83]
-- pub struct AxiomLibrary { [L105]
-- pub struct FormalVerifier; [L566]
+- pub enum MathDomain { [L91]
+- pub struct AxiomLibrary { [L113]
+- pub struct FormalVerifier; [L574]
 
 ### src/verifier/lean.rs
 - pub fn term_to_lean(term: &Term) -> String { [L5]
-- pub fn map_rule_to_lean(rule: &str) -> String { [L28]
-- pub fn export_to_lean4(theorem_name: &str, final_state: &ProofState) -> String { [L71]
-- pub fn export_equality_to_lean4( [L80]
+- pub fn term_to_lean_with_domain(term: &Term, is_bool: bool) -> String { [L9]
+- pub fn is_boolean_equality(eq: &Equality) -> bool { [L58]
+- pub fn map_rule_to_lean(rule: &str) -> String { [L78]
+- pub fn export_to_lean4(theorem_name: &str, final_state: &ProofState) -> String { [L140]
+- pub fn export_equality_to_lean4( [L149]
 
 ### src/verifier/lean_runner.rs
 - pub enum LeanValidationResult { [L8]

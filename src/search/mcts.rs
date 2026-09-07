@@ -226,12 +226,16 @@ impl MctsEngine {
     ) -> Option<ProofState> {
         for _ in 0..max_iterations {
             if let Some(proven_id) = self.step(policy, axioms) {
-                return Some(self.nodes[proven_id].state.clone());
+                let mut state = self.nodes[proven_id].state.clone();
+                state.minimize(axioms);
+                return Some(state);
             }
         }
 
         if let Some(proven_id) = self.proven_node_id {
-            Some(self.nodes[proven_id].state.clone())
+            let mut state = self.nodes[proven_id].state.clone();
+            state.minimize(axioms);
+            Some(state)
         } else {
             None
         }

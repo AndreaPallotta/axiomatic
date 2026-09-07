@@ -109,11 +109,31 @@ impl Lean4Validator {
         result
     }
 
+    pub fn ensure_lean_workspace(dir: &Path) -> std::io::Result<()> {
+        if !dir.exists() {
+            std::fs::create_dir_all(dir)?;
+        }
+
+        let toolchain_path = dir.join("lean-toolchain");
+        if !toolchain_path.exists() {
+            std::fs::write(&toolchain_path, "leanprover/lean4:v4.33.1\n")?;
+        }
+
+        let lakefile_path = dir.join("lakefile.lean");
+        if !lakefile_path.exists() {
+            let lakefile_content = "import Lake\nopen Lake DSL\n\npackage «axiomatic_proofs» where\n\n@[default_target]\nlean_lib «AxiomaticProofs» where\n  srcDir := \".\"\n";
+            std::fs::write(&lakefile_path, lakefile_content)?;
+        }
+
+        Ok(())
+    }
+
     pub fn save_and_validate_proof(
         name: &str,
         state: &ProofState,
         output_dir: &Path,
     ) -> (LeanValidationResult, PathBuf) {
+        let _ = Self::ensure_lean_workspace(output_dir);
         let file_path = output_dir.join(format!("{}.lean", name));
         if let Err(e) = std::fs::create_dir_all(output_dir) {
             return (
@@ -211,6 +231,18 @@ mod tests {
         if Lean4Validator::get_lean_version().is_some() {
             assert!(matches!(res, LeanValidationResult::CompilerError { .. }));
         }
+        Ok(())
+    }
+
+    #[test]
+    fn test_ensure_lean_workspace() -> Result<(), Box<dyn std::error::Error>> {
+        let temp_dir = std::env::temp_dir().join("axiomatic_ws_test");
+        Lean4Validator::ensure_lean_workspace(&temp_dir)?;
+
+        assert!(temp_dir.join("lean-toolchain").exists());
+        assert!(temp_dir.join("lakefile.lean").exists());
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
         Ok(())
     }
 }

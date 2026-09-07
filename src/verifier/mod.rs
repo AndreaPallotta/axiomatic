@@ -10,6 +10,6 @@ pub use exporter::MultiFormatExporter;
 pub use fol::{apply_rewrite, unify, Equality, Term};
 pub use induction::InductionEngine;
 pub use kernel::{AxiomLibrary, FormalVerifier, Goal, ProofState, Tactic};
-pub use lean::{export_to_lean4, term_to_lean};
+pub use lean::{export_equality_to_lean4, export_to_lean4, is_boolean_equality, term_to_lean};
 pub use lean_runner::{Lean4Validator, LeanValidationResult};
 pub use parser::parse_conjecture;

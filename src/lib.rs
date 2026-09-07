@@ -22,8 +22,8 @@ pub use nn::{
 pub use search::{MctsEngine, MctsNode, SearchEvent, SearchGraphSnapshot};
 pub use theory::{CurriculumController, DifficultyLevel, InventedTheorem, TheoryInventor};
 pub use verifier::{
-    export_to_lean4, parse_conjecture, term_to_lean, AxiomLibrary, Equality, FormalVerifier, Goal,
-    InductionEngine, Lean4Validator, LeanValidationResult, MultiFormatExporter, ProofState, Tactic,
-    Term,
+    export_equality_to_lean4, export_to_lean4, is_boolean_equality, parse_conjecture,
+    term_to_lean, AxiomLibrary, Equality, FormalVerifier, Goal, InductionEngine,
+    Lean4Validator, LeanValidationResult, MultiFormatExporter, ProofState, Tactic, Term,
 };
 pub use visualizer::{start_visualizer_server, EngineController};

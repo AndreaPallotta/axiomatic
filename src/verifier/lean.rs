@@ -3,26 +3,76 @@ use super::kernel::{ProofState, Tactic};
 use super::parser::parse_conjecture;
 
 pub fn term_to_lean(term: &Term) -> String {
+    term_to_lean_with_domain(term, false)
+}
+
+pub fn term_to_lean_with_domain(term: &Term, is_bool: bool) -> String {
     match term {
         Term::Var(name) => name.clone(),
-        Term::Const(name) => name.clone(),
+        Term::Const(name) => {
+            if is_bool {
+                match name.as_str() {
+                    "0" | "false" => "false".to_string(),
+                    "1" | "true" => "true".to_string(),
+                    other => other.to_string(),
+                }
+            } else {
+                name.clone()
+            }
+        }
         Term::Func(name, args) => {
             if args.len() == 2 && (name == "+" || name == "*" || name == "·" || name == "^") {
                 let op = if name == "·" { "*" } else { name.as_str() };
                 format!(
                     "({} {} {})",
-                    term_to_lean(&args[0]),
+                    term_to_lean_with_domain(&args[0], is_bool),
                     op,
-                    term_to_lean(&args[1])
+                    term_to_lean_with_domain(&args[1], is_bool)
                 )
-            } else if args.len() == 1 && name == "-" {
-                format!("(-{})", term_to_lean(&args[0]))
+            } else if args.len() == 2 && (name == "&" || name == "∧") {
+                format!(
+                    "({} && {})",
+                    term_to_lean_with_domain(&args[0], is_bool),
+                    term_to_lean_with_domain(&args[1], is_bool)
+                )
+            } else if args.len() == 2 && (name == "|" || name == "∨") {
+                format!(
+                    "({} || {})",
+                    term_to_lean_with_domain(&args[0], is_bool),
+                    term_to_lean_with_domain(&args[1], is_bool)
+                )
+            } else if args.len() == 1 && (name == "-" || name == "!" || name == "¬" || name == "~") {
+                let op = if name == "-" { "-" } else { "!" };
+                format!("({}{})", op, term_to_lean_with_domain(&args[0], is_bool))
             } else {
-                let args_str: Vec<String> = args.iter().map(term_to_lean).collect();
+                let args_str: Vec<String> = args
+                    .iter()
+                    .map(|a| term_to_lean_with_domain(a, is_bool))
+                    .collect();
                 format!("{}({})", name, args_str.join(", "))
             }
         }
     }
+}
+
+pub fn is_boolean_equality(eq: &Equality) -> bool {
+    fn has_bool_symbols(term: &Term) -> bool {
+        match term {
+            Term::Var(_) => false,
+            Term::Const(c) => c == "true" || c == "false",
+            Term::Func(f, args) => {
+                f == "&"
+                    || f == "|"
+                    || f == "!"
+                    || f == "∧"
+                    || f == "∨"
+                    || f == "¬"
+                    || f == "~"
+                    || args.iter().any(has_bool_symbols)
+            }
+        }
+    }
+    has_bool_symbols(&eq.lhs) || has_bool_symbols(&eq.rhs)
 }
 
 pub fn map_rule_to_lean(rule: &str) -> String {
@@ -38,6 +88,25 @@ pub fn map_rule_to_lean(rule: &str) -> String {
         "mul_comm" => "Nat.mul_comm".to_string(),
         "mul_assoc" => "Nat.mul_assoc".to_string(),
         "distrib_left" => "Nat.left_distrib".to_string(),
+
+        "and_true" => "Bool.and_true".to_string(),
+        "true_and" => "Bool.true_and".to_string(),
+        "or_false" => "Bool.or_false".to_string(),
+        "false_or" => "Bool.false_or".to_string(),
+        "and_false" => "Bool.and_false".to_string(),
+        "false_and" => "Bool.false_and".to_string(),
+        "or_true" => "Bool.or_true".to_string(),
+        "true_or" => "Bool.true_or".to_string(),
+        "and_comm" => "Bool.and_comm".to_string(),
+        "or_comm" => "Bool.or_comm".to_string(),
+        "and_assoc" => "Bool.and_assoc".to_string(),
+        "or_assoc" => "Bool.or_assoc".to_string(),
+        "not_not" => "Bool.not_not".to_string(),
+        "not_and" => "Bool.not_and".to_string(),
+        "not_or" => "Bool.not_or".to_string(),
+        "de_morgan_and" => "Bool.not_and".to_string(),
+        "de_morgan_or" => "Bool.not_or".to_string(),
+
         other => other.to_string(),
     }
 }
@@ -100,18 +169,21 @@ pub fn export_equality_to_lean4(
     vars.sort();
     vars.dedup();
 
+    let is_bool = is_boolean_equality(goal);
+    let type_name = if is_bool { "Bool" } else { "Nat" };
+
     let var_signature = if vars.is_empty() {
         String::new()
     } else {
-        format!("({} : Nat) ", vars.join(" "))
+        format!("({} : {}) ", vars.join(" "), type_name)
     };
 
     code.push_str(&format!(
         "theorem {} {}: {} = {} := by\n",
         theorem_name,
         var_signature,
-        term_to_lean(&goal.lhs),
-        term_to_lean(&goal.rhs)
+        term_to_lean_with_domain(&goal.lhs, is_bool),
+        term_to_lean_with_domain(&goal.rhs, is_bool)
     ));
 
     let mut curr_goal = Some(goal.clone());
@@ -189,7 +261,11 @@ pub fn export_equality_to_lean4(
     }
 
     code.push_str("  try rfl\n");
-    code.push_str("  try omega\n");
+    if is_bool {
+        code.push_str("  try decide\n");
+    } else {
+        code.push_str("  try omega\n");
+    }
 
     code
 }
@@ -228,5 +304,35 @@ mod tests {
         assert!(lean.contains("theorem thm_add_zero (x : Nat) : (x + 0) = x := by"));
         assert!(!lean.contains("sorry"));
         assert!(lean.contains("Nat.add_zero"));
+    }
+
+    #[test]
+    fn test_export_to_lean4_boolean() -> Result<(), Box<dyn std::error::Error>> {
+        let a = Term::var("a");
+        let one = Term::constant("1");
+        let goal = Equality::new(
+            Term::func("&", vec![a.clone(), one.clone()]),
+            a.clone(),
+        );
+        let mut state = ProofState::new(goal.clone());
+        state.proof_history.push((
+            Tactic::RewriteLhs("and_true".to_string()),
+            "Rewrote LHS via [and_true]: a = a".to_string(),
+        ));
+        state.proof_history.push((
+            Tactic::Reflexivity,
+            "Solved #1: a = a via rfl".to_string(),
+        ));
+
+        let lean = export_to_lean4("thm_and_true", &state);
+        assert!(lean.contains("theorem thm_and_true (a : Bool) : (a && true) = a := by"));
+        assert!(lean.contains("Bool.and_true"));
+        assert!(lean.contains("try decide"));
+
+        let res = crate::verifier::lean_runner::Lean4Validator::validate_proof("thm_and_true", &state);
+        if crate::verifier::lean_runner::Lean4Validator::get_lean_version().is_some() {
+            assert!(matches!(res, crate::verifier::lean_runner::LeanValidationResult::Certified { .. }));
+        }
+        Ok(())
     }
 }

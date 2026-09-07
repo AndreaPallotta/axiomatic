@@ -64,16 +64,24 @@ impl ProofState {
         }
     }
 
-    /// Checks if all goals are solved
     pub fn check_solved(&mut self) -> bool {
         if self.open_goals.is_empty() {
             self.is_solved = true;
             true
         } else {
-            // Check if any open goal is trivially reflexive (A = A)
             self.open_goals.retain(|g| g.equality.lhs != g.equality.rhs);
             self.is_solved = self.open_goals.is_empty();
             self.is_solved
+        }
+    }
+
+    pub fn minimize(&mut self, axioms: &AxiomLibrary) {
+        if let Some(ref initial) = self.initial_equality {
+            if self.is_solved && !self.proof_history.is_empty() {
+                self.proof_history =
+                    FormalVerifier::prune_proof_history(initial, &self.proof_history, axioms);
+                self.depth = self.proof_history.len();
+            }
         }
     }
 }
@@ -742,6 +750,52 @@ impl FormalVerifier {
 
         successors
     }
+
+    pub fn prune_proof_history(
+        initial: &Equality,
+        history: &[(Tactic, String)],
+        axioms: &AxiomLibrary,
+    ) -> Vec<(Tactic, String)> {
+        let mut pruned = history.to_vec();
+
+        let mut changed = true;
+        while changed {
+            changed = false;
+            let mut i = 0;
+            while i + 1 < pruned.len() {
+                if matches!(pruned[i].0, Tactic::Symmetry) && matches!(pruned[i + 1].0, Tactic::Symmetry) {
+                    pruned.remove(i + 1);
+                    pruned.remove(i);
+                    changed = true;
+                    break;
+                }
+                i += 1;
+            }
+        }
+
+        let mut i = pruned.len();
+        while i > 0 {
+            i -= 1;
+            let mut candidate = pruned.clone();
+            candidate.remove(i);
+
+            let mut test_state = ProofState::new(initial.clone());
+            let mut valid = true;
+            for (tac, _) in &candidate {
+                match Self::apply_tactic(&test_state, tac, axioms) {
+                    Ok(next) => test_state = next,
+                    Err(_) => {
+                        valid = false;
+                        break;
+                    }
+                }
+            }
+            if valid && test_state.is_solved {
+                pruned = candidate;
+            }
+        }
+        pruned
+    }
 }
 
 #[cfg(test)]
@@ -752,7 +806,6 @@ mod tests {
     fn test_prove_commutativity_identity() {
         let axioms = AxiomLibrary::standard_algebra();
 
-        // Goal: a + 0 = 0 + a
         let a = Term::constant("a");
         let zero = Term::constant("0");
         let goal_eq = Equality::new(
@@ -763,7 +816,6 @@ mod tests {
         let initial_state = ProofState::new(goal_eq);
         assert!(!initial_state.is_solved);
 
-        // Step 1: rw_lhs [add_zero] -> a = 0 + a
         let step1 = FormalVerifier::apply_tactic(
             &initial_state,
             &Tactic::RewriteLhs("add_zero".to_string()),
@@ -771,7 +823,6 @@ mod tests {
         )
         .expect("Step 1 valid");
 
-        // Step 2: rw_rhs [zero_add] -> a = a (automatically recognized as reflexive & solved)
         let step2 = FormalVerifier::apply_tactic(
             &step1,
             &Tactic::RewriteRhs("zero_add".to_string()),
@@ -784,5 +835,41 @@ mod tests {
             "Proof must be certified complete upon reaching reflexivity"
         );
         assert_eq!(step2.proof_history.len(), 2);
+    }
+
+    #[test]
+    fn test_proof_minimization_prunes_redundancy() -> Result<(), Box<dyn std::error::Error>> {
+        let axioms = AxiomLibrary::standard_algebra();
+        let a = Term::constant("a");
+        let zero = Term::constant("0");
+        let goal_eq = Equality::new(
+            Term::func("+", vec![a.clone(), zero.clone()]),
+            a.clone(),
+        );
+
+        let initial_state = ProofState::new(goal_eq);
+        let step1 = FormalVerifier::apply_tactic(
+            &initial_state,
+            &Tactic::Symmetry,
+            &axioms,
+        )?;
+        let step2 = FormalVerifier::apply_tactic(
+            &step1,
+            &Tactic::Symmetry,
+            &axioms,
+        )?;
+        let mut step3 = FormalVerifier::apply_tactic(
+            &step2,
+            &Tactic::RewriteLhs("add_zero".to_string()),
+            &axioms,
+        )?;
+        assert!(step3.is_solved);
+        assert_eq!(step3.proof_history.len(), 3);
+
+        step3.minimize(&axioms);
+        assert!(step3.is_solved);
+        assert_eq!(step3.proof_history.len(), 1);
+        assert_eq!(step3.proof_history[0].0, Tactic::RewriteLhs("add_zero".to_string()));
+        Ok(())
     }
 }

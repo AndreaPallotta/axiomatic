@@ -172,31 +172,42 @@ fn run_autonomous_proof_cli(custom_conjecture: Option<&str>) {
     println!("[INFO] Initiating Neurosymbolic MCTS Proof Search");
     println!("================================================================================");
 
-    let axioms = AxiomLibrary::standard_algebra();
-    let (model, epochs, _) = axiomatic::ModelCheckpoint::try_load_or_init("models");
-    let policy = axiomatic::DeepNeuralPolicy::new(model);
-    if epochs > 0 {
-        println!(
-            "[INFO] Using Trained Neural Network (Trained for {} Epochs)",
-            epochs
-        );
-    } else {
-        println!("[INFO] Using Initialized Neural Network");
-    }
-
-    let target_eq = if let Some(conjecture_str) = custom_conjecture {
+    let (target_eq, is_bool) = if let Some(conjecture_str) = custom_conjecture {
         match parse_conjecture(conjecture_str) {
             Ok(eq) => {
                 println!("[INPUT] Parsed target conjecture: {}", eq);
-                eq
+                let is_b = axiomatic::is_boolean_equality(&eq);
+                (eq, is_b)
             }
             Err(e) => {
                 println!("[WARN] Failed to parse input '{}': {}. Using default conjecture.", conjecture_str, e);
-                default_target_conjecture()
+                (default_target_conjecture(), false)
             }
         }
     } else {
-        default_target_conjecture()
+        (default_target_conjecture(), false)
+    };
+
+    let axioms = if is_bool {
+        println!("[DOMAIN] Detected Propositional Boolean Logic Domain");
+        AxiomLibrary::boolean_logic()
+    } else {
+        AxiomLibrary::standard_algebra()
+    };
+
+    let (model, epochs, _) = axiomatic::ModelCheckpoint::try_load_or_init("models");
+    let policy: Box<dyn axiomatic::NeuralPolicy> = if is_bool {
+        Box::new(SymbolicNeuralPolicy::new())
+    } else {
+        if epochs > 0 {
+            println!(
+                "[INFO] Using Trained Neural Network (Trained for {} Epochs)",
+                epochs
+            );
+        } else {
+            println!("[INFO] Using Initialized Neural Network");
+        }
+        Box::new(axiomatic::DeepNeuralPolicy::new(model))
     };
 
     println!("[TARGET] Conjecture: {}\n", target_eq);
@@ -205,7 +216,7 @@ fn run_autonomous_proof_cli(custom_conjecture: Option<&str>) {
     let mut mcts = MctsEngine::new(initial_state, 8);
 
     let start = std::time::Instant::now();
-    let proof = mcts.run_search(&policy, &axioms, 250);
+    let proof = mcts.run_search(policy.as_ref(), &axioms, 250);
     let elapsed = start.elapsed();
 
     if let Some(solved_state) = proof {
@@ -304,11 +315,21 @@ fn run_compounding_memory_demo() {
         .expect("Lemma must be proven");
     println!("  [OK] Lemma verified in {} steps", p1.proof_history.len());
 
-    // Record in database
-    database.record_theorem("lemma_add_zero_comm", lemma_eq, p1);
+    // Record in database with Lean 4 formal certification gate
+    match database.record_and_certify("lemma_add_zero_comm", lemma_eq, p1) {
+        Ok(LeanValidationResult::Certified { elapsed_ms, .. }) => {
+            println!("  [CERTIFIED] Formally verified by Lean 4 ({:.3} ms) -> Admitted to Knowledge Base", elapsed_ms);
+        }
+        Ok(_) => {
+            println!("  [OK] Registered in Knowledge Base (Lean 4 gate passed)");
+        }
+        Err(e) => {
+            println!("  [REJECTED] Knowledge Base rejected unverified lemma: {}", e);
+        }
+    }
     database.augment_axioms(&mut axioms);
     println!(
-        "  [OK] Registered in Knowledge Base. Total active rules: {}\n",
+        "  [OK] Total active rules in library: {}\n",
         axioms.rules.len()
     );
 
