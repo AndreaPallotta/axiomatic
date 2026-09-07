@@ -763,7 +763,9 @@ impl FormalVerifier {
             changed = false;
             let mut i = 0;
             while i + 1 < pruned.len() {
-                if matches!(pruned[i].0, Tactic::Symmetry) && matches!(pruned[i + 1].0, Tactic::Symmetry) {
+                if matches!(pruned[i].0, Tactic::Symmetry)
+                    && matches!(pruned[i + 1].0, Tactic::Symmetry)
+                {
                     pruned.remove(i + 1);
                     pruned.remove(i);
                     changed = true;
@@ -842,22 +844,11 @@ mod tests {
         let axioms = AxiomLibrary::standard_algebra();
         let a = Term::constant("a");
         let zero = Term::constant("0");
-        let goal_eq = Equality::new(
-            Term::func("+", vec![a.clone(), zero.clone()]),
-            a.clone(),
-        );
+        let goal_eq = Equality::new(Term::func("+", vec![a.clone(), zero.clone()]), a.clone());
 
         let initial_state = ProofState::new(goal_eq);
-        let step1 = FormalVerifier::apply_tactic(
-            &initial_state,
-            &Tactic::Symmetry,
-            &axioms,
-        )?;
-        let step2 = FormalVerifier::apply_tactic(
-            &step1,
-            &Tactic::Symmetry,
-            &axioms,
-        )?;
+        let step1 = FormalVerifier::apply_tactic(&initial_state, &Tactic::Symmetry, &axioms)?;
+        let step2 = FormalVerifier::apply_tactic(&step1, &Tactic::Symmetry, &axioms)?;
         let mut step3 = FormalVerifier::apply_tactic(
             &step2,
             &Tactic::RewriteLhs("add_zero".to_string()),
@@ -869,7 +860,10 @@ mod tests {
         step3.minimize(&axioms);
         assert!(step3.is_solved);
         assert_eq!(step3.proof_history.len(), 1);
-        assert_eq!(step3.proof_history[0].0, Tactic::RewriteLhs("add_zero".to_string()));
+        assert_eq!(
+            step3.proof_history[0].0,
+            Tactic::RewriteLhs("add_zero".to_string())
+        );
         Ok(())
     }
 }

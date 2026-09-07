@@ -104,19 +104,15 @@ mod tests {
         let mut db = LemmaDatabase::new();
         let x = Term::var("x");
         let zero = Term::constant("0");
-        let eq = Equality::new(
-            Term::func("+", vec![x.clone(), zero.clone()]),
-            x.clone(),
-        );
+        let eq = Equality::new(Term::func("+", vec![x.clone(), zero.clone()]), x.clone());
         let mut state = ProofState::new(eq.clone());
         state.proof_history.push((
             Tactic::RewriteLhs("add_zero".to_string()),
             "Rewrote LHS via [add_zero]: x = x".to_string(),
         ));
-        state.proof_history.push((
-            Tactic::Reflexivity,
-            "Solved #1: x = x via rfl".to_string(),
-        ));
+        state
+            .proof_history
+            .push((Tactic::Reflexivity, "Solved #1: x = x via rfl".to_string()));
 
         let res = db.record_and_certify("cert_lemma_add_zero", eq, state);
         assert!(res.is_ok());

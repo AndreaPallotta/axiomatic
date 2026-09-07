@@ -1,8 +1,8 @@
 #![allow(unused_variables, dead_code, clippy::all)]
 
 use axiomatic::{
-    export_to_lean4, parse_conjecture, AxiomLibrary, Equality, LemmaDatabase, MctsEngine,
-    ProofState, SymbolicNeuralPolicy, Term, Lean4Validator, LeanValidationResult,
+    export_to_lean4, parse_conjecture, AxiomLibrary, Equality, Lean4Validator,
+    LeanValidationResult, LemmaDatabase, MctsEngine, ProofState, SymbolicNeuralPolicy, Term,
 };
 use std::env;
 use std::path::Path;
@@ -31,7 +31,9 @@ fn print_usage() {
     );
     println!("  serve [PORT]          Launch live Web Graphical Dashboard (default: 3000)");
     println!("  demo                  Run autonomous theorem discovery and memory compounding");
-    println!("  lean                  Generate, export, and formally certify Lean 4 proof artifacts\n");
+    println!(
+        "  lean                  Generate, export, and formally certify Lean 4 proof artifacts\n"
+    );
 }
 
 #[tokio::main]
@@ -180,7 +182,10 @@ fn run_autonomous_proof_cli(custom_conjecture: Option<&str>) {
                 (eq, is_b)
             }
             Err(e) => {
-                println!("[WARN] Failed to parse input '{}': {}. Using default conjecture.", conjecture_str, e);
+                println!(
+                    "[WARN] Failed to parse input '{}': {}. Using default conjecture.",
+                    conjecture_str, e
+                );
                 (default_target_conjecture(), false)
             }
         }
@@ -248,7 +253,10 @@ fn run_autonomous_proof_cli(custom_conjecture: Option<&str>) {
             Lean4Validator::save_and_validate_proof(theorem_name, &solved_state, proofs_dir);
 
         match val_result {
-            LeanValidationResult::Certified { elapsed_ms, lean_version } => {
+            LeanValidationResult::Certified {
+                elapsed_ms,
+                lean_version,
+            } => {
                 println!("  - Proof Artifact:  {}", artifact_path.display());
                 println!("  - Status:          CERTIFIED by Lean 4 Kernel");
                 println!("  - Kernel Time:     {:.3} ms", elapsed_ms);
@@ -266,7 +274,9 @@ fn run_autonomous_proof_cli(custom_conjecture: Option<&str>) {
             }
             LeanValidationResult::LeanNotInstalled { message } => {
                 println!("  - Proof Artifact:  {}", artifact_path.display());
-                println!("  - Status:          Lean 4 not detected (proof saved, compilation skipped)");
+                println!(
+                    "  - Status:          Lean 4 not detected (proof saved, compilation skipped)"
+                );
                 println!("  - Note:            {}", message);
             }
         }
@@ -324,7 +334,10 @@ fn run_compounding_memory_demo() {
             println!("  [OK] Registered in Knowledge Base (Lean 4 gate passed)");
         }
         Err(e) => {
-            println!("  [REJECTED] Knowledge Base rejected unverified lemma: {}", e);
+            println!(
+                "  [REJECTED] Knowledge Base rejected unverified lemma: {}",
+                e
+            );
         }
     }
     database.augment_axioms(&mut axioms);
@@ -380,12 +393,18 @@ fn run_lean_export_demo() {
         Lean4Validator::save_and_validate_proof(theorem_name, &proof, proofs_dir);
 
     let lean_code = export_to_lean4(theorem_name, &proof);
-    println!("Generated Lean 4 Proof Artifact ({}):\n", artifact_path.display());
+    println!(
+        "Generated Lean 4 Proof Artifact ({}):\n",
+        artifact_path.display()
+    );
     println!("{}", lean_code);
 
     println!("================================================================================");
     match val_result {
-        LeanValidationResult::Certified { elapsed_ms, lean_version } => {
+        LeanValidationResult::Certified {
+            elapsed_ms,
+            lean_version,
+        } => {
             println!("[CERTIFICATION] Formally Certified by Lean 4 Kernel");
             println!("  - Artifact:        {}", artifact_path.display());
             println!("  - Validation:      Kernel Confirmed (0 errors, 0 warnings, no sorry)");

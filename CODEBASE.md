@@ -1,6 +1,6 @@
 ﻿# Codebase Map
-Generated: 2026-09-07 19:42:57
-Commit: 611c50c feat(verifier): add proof minimization, lean workspace scaffolding, boolean domain, and memory gate
+Generated: 2026-09-07 19:47:52
+Commit: 9aac109 chore(release): prepare v0.3.0 release and update gitignore
 
 This file is a compact index of the codebase for AI agents to understand project structure without full recursive file scans.
 
@@ -11,7 +11,7 @@ See [DEPS.md](file:///c:/Users/andre/OneDrive/Desktop/projects/agent-devkit/DEPS
 - **.github/workflows/ci.yml** (43 lines)
 - **.github/workflows/release.yml** (125 lines)
 - **AGENT.md** (33 lines)
-- **CHANGELOG.md** (33 lines)
+- **CHANGELOG.md** (56 lines)
 - **CLAUDE.md** (30 lines)
 - **CODEBASE.md** (192 lines)
 - **DECISIONS.md** (31 lines)
@@ -27,13 +27,13 @@ See [DEPS.md](file:///c:/Users/andre/OneDrive/Desktop/projects/agent-devkit/DEPS
 - **src/generator/policy.rs** (133 lines)
 - **src/generator/prompt.rs** (22 lines)
 - **src/lib.rs** (30 lines)
-- **src/main.rs** (410 lines)
-- **src/memory/database.rs** (130 lines)
+- **src/main.rs** (429 lines)
+- **src/memory/database.rs** (126 lines)
 - **src/memory/mod.rs** (8 lines)
 - **src/memory/vectordb.rs** (177 lines)
-- **src/nn/embedding.rs** (154 lines)
-- **src/nn/gnn.rs** (150 lines)
-- **src/nn/graph.rs** (345 lines)
+- **src/nn/embedding.rs** (157 lines)
+- **src/nn/gnn.rs** (154 lines)
+- **src/nn/graph.rs** (465 lines)
 - **src/nn/mod.rs** (22 lines)
 - **src/nn/model.rs** (327 lines)
 - **src/nn/optim.rs** (383 lines)
@@ -50,9 +50,9 @@ See [DEPS.md](file:///c:/Users/andre/OneDrive/Desktop/projects/agent-devkit/DEPS
 - **src/verifier/exporter.rs** (136 lines)
 - **src/verifier/fol.rs** (277 lines)
 - **src/verifier/induction.rs** (94 lines)
-- **src/verifier/kernel.rs** (876 lines)
-- **src/verifier/lean.rs** (339 lines)
-- **src/verifier/lean_runner.rs** (249 lines)
+- **src/verifier/kernel.rs** (870 lines)
+- **src/verifier/lean.rs** (337 lines)
+- **src/verifier/lean_runner.rs** (262 lines)
 - **src/verifier/mod.rs** (16 lines)
 - **src/verifier/parser.rs** (287 lines)
 - **src/visualizer/mod.rs** (4 lines)
@@ -88,8 +88,8 @@ See [DEPS.md](file:///c:/Users/andre/OneDrive/Desktop/projects/agent-devkit/DEPS
 - pub fn euclidean_distance(a: &[f64], b: &[f64]) -> f64 { [L131]
 
 ### src/nn/embedding.rs
-- pub fn graph_vectorize_proof_state(gnn: &SparseGraphAttentionNetwork, state: &ProofState) -> Vec<f64> { [L9]
-- pub fn vectorize_proof_state(state: &ProofState) -> Vec<f64> { [L27]
+- pub fn graph_vectorize_proof_state( [L9]
+- pub fn vectorize_proof_state(state: &ProofState) -> Vec<f64> { [L30]
 
 ### src/nn/gnn.rs
 - pub struct SparseGraphAttentionNetwork { [L9]
@@ -173,10 +173,10 @@ See [DEPS.md](file:///c:/Users/andre/OneDrive/Desktop/projects/agent-devkit/DEPS
 ### src/verifier/lean.rs
 - pub fn term_to_lean(term: &Term) -> String { [L5]
 - pub fn term_to_lean_with_domain(term: &Term, is_bool: bool) -> String { [L9]
-- pub fn is_boolean_equality(eq: &Equality) -> bool { [L58]
-- pub fn map_rule_to_lean(rule: &str) -> String { [L78]
-- pub fn export_to_lean4(theorem_name: &str, final_state: &ProofState) -> String { [L140]
-- pub fn export_equality_to_lean4( [L149]
+- pub fn is_boolean_equality(eq: &Equality) -> bool { [L59]
+- pub fn map_rule_to_lean(rule: &str) -> String { [L79]
+- pub fn export_to_lean4(theorem_name: &str, final_state: &ProofState) -> String { [L143]
+- pub fn export_equality_to_lean4( [L152]
 
 ### src/verifier/lean_runner.rs
 - pub enum LeanValidationResult { [L8]

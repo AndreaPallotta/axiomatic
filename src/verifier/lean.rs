@@ -41,7 +41,8 @@ pub fn term_to_lean_with_domain(term: &Term, is_bool: bool) -> String {
                     term_to_lean_with_domain(&args[0], is_bool),
                     term_to_lean_with_domain(&args[1], is_bool)
                 )
-            } else if args.len() == 1 && (name == "-" || name == "!" || name == "¬" || name == "~") {
+            } else if args.len() == 1 && (name == "-" || name == "!" || name == "¬" || name == "~")
+            {
                 let op = if name == "-" { "-" } else { "!" };
                 format!("({}{})", op, term_to_lean_with_domain(&args[0], is_bool))
             } else {
@@ -116,7 +117,9 @@ fn find_ast_path(orig: &Term, transformed: &Term) -> Vec<usize> {
         return Vec::new();
     }
     match (orig, transformed) {
-        (Term::Func(f1, args1), Term::Func(f2, args2)) if f1 == f2 && args1.len() == args2.len() => {
+        (Term::Func(f1, args1), Term::Func(f2, args2))
+            if f1 == f2 && args1.len() == args2.len() =>
+        {
             let mut diff_indices = Vec::new();
             for (i, (a1, a2)) in args1.iter().zip(args2.iter()).enumerate() {
                 if a1 != a2 {
@@ -189,7 +192,9 @@ pub fn export_equality_to_lean4(
     let mut curr_goal = Some(goal.clone());
 
     for (tactic, desc) in &final_state.proof_history {
-        let parsed_new_eq = desc.split_once(": ").and_then(|(_, s)| parse_conjecture(s).ok());
+        let parsed_new_eq = desc
+            .split_once(": ")
+            .and_then(|(_, s)| parse_conjecture(s).ok());
 
         match tactic {
             Tactic::RewriteLhs(rule) => {
@@ -208,10 +213,7 @@ pub fn export_equality_to_lean4(
                     for idx in path {
                         nav.push_str(&format!("arg {}; ", idx + 1));
                     }
-                    code.push_str(&format!(
-                        "  try (conv => lhs; {}rw [{}])\n",
-                        nav, lean_rule
-                    ));
+                    code.push_str(&format!("  try (conv => lhs; {}rw [{}])\n", nav, lean_rule));
                     code.push_str(&format!("  try (conv => lhs; rw [{}])\n", lean_rule));
                 }
 
@@ -234,10 +236,7 @@ pub fn export_equality_to_lean4(
                     for idx in path {
                         nav.push_str(&format!("arg {}; ", idx + 1));
                     }
-                    code.push_str(&format!(
-                        "  try (conv => rhs; {}rw [{}])\n",
-                        nav, lean_rule
-                    ));
+                    code.push_str(&format!("  try (conv => rhs; {}rw [{}])\n", nav, lean_rule));
                     code.push_str(&format!("  try (conv => rhs; rw [{}])\n", lean_rule));
                 }
 
@@ -295,10 +294,9 @@ mod tests {
             Tactic::RewriteLhs("add_zero".to_string()),
             "Rewrote LHS via [add_zero]: x = x".to_string(),
         ));
-        state.proof_history.push((
-            Tactic::Reflexivity,
-            "Solved #1: x = x via rfl".to_string(),
-        ));
+        state
+            .proof_history
+            .push((Tactic::Reflexivity, "Solved #1: x = x via rfl".to_string()));
 
         let lean = export_to_lean4("thm_add_zero", &state);
         assert!(lean.contains("theorem thm_add_zero (x : Nat) : (x + 0) = x := by"));
@@ -310,28 +308,28 @@ mod tests {
     fn test_export_to_lean4_boolean() -> Result<(), Box<dyn std::error::Error>> {
         let a = Term::var("a");
         let one = Term::constant("1");
-        let goal = Equality::new(
-            Term::func("&", vec![a.clone(), one.clone()]),
-            a.clone(),
-        );
+        let goal = Equality::new(Term::func("&", vec![a.clone(), one.clone()]), a.clone());
         let mut state = ProofState::new(goal.clone());
         state.proof_history.push((
             Tactic::RewriteLhs("and_true".to_string()),
             "Rewrote LHS via [and_true]: a = a".to_string(),
         ));
-        state.proof_history.push((
-            Tactic::Reflexivity,
-            "Solved #1: a = a via rfl".to_string(),
-        ));
+        state
+            .proof_history
+            .push((Tactic::Reflexivity, "Solved #1: a = a via rfl".to_string()));
 
         let lean = export_to_lean4("thm_and_true", &state);
         assert!(lean.contains("theorem thm_and_true (a : Bool) : (a && true) = a := by"));
         assert!(lean.contains("Bool.and_true"));
         assert!(lean.contains("try decide"));
 
-        let res = crate::verifier::lean_runner::Lean4Validator::validate_proof("thm_and_true", &state);
+        let res =
+            crate::verifier::lean_runner::Lean4Validator::validate_proof("thm_and_true", &state);
         if crate::verifier::lean_runner::Lean4Validator::get_lean_version().is_some() {
-            assert!(matches!(res, crate::verifier::lean_runner::LeanValidationResult::Certified { .. }));
+            assert!(matches!(
+                res,
+                crate::verifier::lean_runner::LeanValidationResult::Certified { .. }
+            ));
         }
         Ok(())
     }

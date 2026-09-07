@@ -79,9 +79,15 @@ impl MasterMathGraph {
             edge_type: edge_type.clone(),
             weight,
         });
-        self.adjacency.entry(from).or_default().push((to, edge_type.clone(), weight));
+        self.adjacency
+            .entry(from)
+            .or_default()
+            .push((to, edge_type.clone(), weight));
         // Undirected message passing connectivity
-        self.adjacency.entry(to).or_default().push((from, edge_type, weight));
+        self.adjacency
+            .entry(to)
+            .or_default()
+            .push((from, edge_type, weight));
     }
 
     /// Constructs the standard unified mathematical universe
@@ -89,48 +95,136 @@ impl MasterMathGraph {
         let mut g = Self::new();
 
         // 1. Shared Universal Isomorphism Hubs
-        let prop_comm = g.add_node(NodeType::AxiomProperty("Commutativity".into()), "Commutativity", &["universal", "algebra", "boolean", "sets"]);
-        let prop_assoc = g.add_node(NodeType::AxiomProperty("Associativity".into()), "Associativity", &["universal", "algebra", "boolean", "sets"]);
-        let prop_dist = g.add_node(NodeType::AxiomProperty("Distributivity".into()), "Distributivity", &["universal", "algebra", "boolean", "sets"]);
-        let prop_ident = g.add_node(NodeType::AxiomProperty("Identity".into()), "Identity", &["universal", "algebra", "boolean", "sets"]);
-        let prop_absorb = g.add_node(NodeType::AxiomProperty("Annihilation".into()), "Annihilation", &["universal", "algebra", "boolean", "sets"]);
-        let prop_inv = g.add_node(NodeType::AxiomProperty("Inversion".into()), "Inversion", &["universal", "algebra", "boolean", "sets"]);
-        let prop_demorgan = g.add_node(NodeType::AxiomProperty("DeMorgan".into()), "DeMorgan", &["universal", "boolean", "sets"]);
-        let prop_linear = g.add_node(NodeType::AxiomProperty("Linearity".into()), "Linearity", &["universal", "calculus"]);
+        let prop_comm = g.add_node(
+            NodeType::AxiomProperty("Commutativity".into()),
+            "Commutativity",
+            &["universal", "algebra", "boolean", "sets"],
+        );
+        let prop_assoc = g.add_node(
+            NodeType::AxiomProperty("Associativity".into()),
+            "Associativity",
+            &["universal", "algebra", "boolean", "sets"],
+        );
+        let prop_dist = g.add_node(
+            NodeType::AxiomProperty("Distributivity".into()),
+            "Distributivity",
+            &["universal", "algebra", "boolean", "sets"],
+        );
+        let prop_ident = g.add_node(
+            NodeType::AxiomProperty("Identity".into()),
+            "Identity",
+            &["universal", "algebra", "boolean", "sets"],
+        );
+        let prop_absorb = g.add_node(
+            NodeType::AxiomProperty("Annihilation".into()),
+            "Annihilation",
+            &["universal", "algebra", "boolean", "sets"],
+        );
+        let prop_inv = g.add_node(
+            NodeType::AxiomProperty("Inversion".into()),
+            "Inversion",
+            &["universal", "algebra", "boolean", "sets"],
+        );
+        let prop_demorgan = g.add_node(
+            NodeType::AxiomProperty("DeMorgan".into()),
+            "DeMorgan",
+            &["universal", "boolean", "sets"],
+        );
+        let prop_linear = g.add_node(
+            NodeType::AxiomProperty("Linearity".into()),
+            "Linearity",
+            &["universal", "calculus"],
+        );
 
         // 2. Constants
-        let c_zero = g.add_node(NodeType::Constant("0".into()), "0 / Empty / False", &["algebra", "calculus", "sets", "peano"]);
-        let c_one = g.add_node(NodeType::Constant("1".into()), "1 / Universe / True", &["algebra", "calculus", "boolean"]);
+        let c_zero = g.add_node(
+            NodeType::Constant("0".into()),
+            "0 / Empty / False",
+            &["algebra", "calculus", "sets", "peano"],
+        );
+        let c_one = g.add_node(
+            NodeType::Constant("1".into()),
+            "1 / Universe / True",
+            &["algebra", "calculus", "boolean"],
+        );
         let c_univ = g.add_node(NodeType::Constant("U".into()), "Universal Set", &["sets"]);
         let var_node = g.add_node(NodeType::Variable, "Variable", &["universal"]);
 
         // 3. Algebraic Operators
-        let op_add = g.add_node(NodeType::Operator("+".into()), "Addition (+)", &["algebra", "calculus"]);
-        let op_mul = g.add_node(NodeType::Operator("*".into()), "Multiplication (*)", &["algebra", "calculus"]);
-        let op_neg = g.add_node(NodeType::Operator("-".into()), "Additive Negation (-)", &["algebra"]);
+        let op_add = g.add_node(
+            NodeType::Operator("+".into()),
+            "Addition (+)",
+            &["algebra", "calculus"],
+        );
+        let op_mul = g.add_node(
+            NodeType::Operator("*".into()),
+            "Multiplication (*)",
+            &["algebra", "calculus"],
+        );
+        let op_neg = g.add_node(
+            NodeType::Operator("-".into()),
+            "Additive Negation (-)",
+            &["algebra"],
+        );
 
         // 4. Boolean Propositional Operators
-        let op_and = g.add_node(NodeType::Operator("&".into()), "Conjunction (&)", &["boolean"]);
-        let op_or = g.add_node(NodeType::Operator("|".into()), "Disjunction (|)", &["boolean"]);
+        let op_and = g.add_node(
+            NodeType::Operator("&".into()),
+            "Conjunction (&)",
+            &["boolean"],
+        );
+        let op_or = g.add_node(
+            NodeType::Operator("|".into()),
+            "Disjunction (|)",
+            &["boolean"],
+        );
         let op_not = g.add_node(NodeType::Operator("!".into()), "Negation (!)", &["boolean"]);
 
         // 5. Set Theoretic Operators
-        let op_inter = g.add_node(NodeType::Operator("inter".into()), "Intersection", &["sets"]);
+        let op_inter = g.add_node(
+            NodeType::Operator("inter".into()),
+            "Intersection",
+            &["sets"],
+        );
         let op_union = g.add_node(NodeType::Operator("union".into()), "Union", &["sets"]);
         let op_comp = g.add_node(NodeType::Operator("comp".into()), "Complement", &["sets"]);
 
         // 6. Calculus Operators
-        let op_diff = g.add_node(NodeType::Operator("D".into()), "Derivative (D)", &["calculus"]);
+        let op_diff = g.add_node(
+            NodeType::Operator("D".into()),
+            "Derivative (D)",
+            &["calculus"],
+        );
 
         // 7. Peano Arithmetic Operator
         let op_succ = g.add_node(NodeType::Operator("S".into()), "Successor (S)", &["peano"]);
 
         // 8. Tactics
-        let tac_rw_lhs = g.add_node(NodeType::TacticPrimitive("RewriteLhs".into()), "Rewrite LHS", &["universal"]);
-        let tac_rw_rhs = g.add_node(NodeType::TacticPrimitive("RewriteRhs".into()), "Rewrite RHS", &["universal"]);
-        let tac_symm = g.add_node(NodeType::TacticPrimitive("Symmetry".into()), "Symmetry", &["universal"]);
-        let tac_rfl = g.add_node(NodeType::TacticPrimitive("Reflexivity".into()), "Reflexivity", &["universal"]);
-        let tac_ind = g.add_node(NodeType::TacticPrimitive("Induction".into()), "Peano Induction", &["peano"]);
+        let tac_rw_lhs = g.add_node(
+            NodeType::TacticPrimitive("RewriteLhs".into()),
+            "Rewrite LHS",
+            &["universal"],
+        );
+        let tac_rw_rhs = g.add_node(
+            NodeType::TacticPrimitive("RewriteRhs".into()),
+            "Rewrite RHS",
+            &["universal"],
+        );
+        let tac_symm = g.add_node(
+            NodeType::TacticPrimitive("Symmetry".into()),
+            "Symmetry",
+            &["universal"],
+        );
+        let tac_rfl = g.add_node(
+            NodeType::TacticPrimitive("Reflexivity".into()),
+            "Reflexivity",
+            &["universal"],
+        );
+        let tac_ind = g.add_node(
+            NodeType::TacticPrimitive("Induction".into()),
+            "Peano Induction",
+            &["peano"],
+        );
 
         // Connect Isomorphisms & Properties to Operations
         // Addition & Multiplication
@@ -239,22 +333,29 @@ impl MasterMathGraph {
         for (tactic, _) in &state.proof_history {
             match tactic {
                 crate::verifier::kernel::Tactic::RewriteLhs(_) => {
-                    if let Some(id) = self.find_node(&NodeType::TacticPrimitive("RewriteLhs".into())) {
+                    if let Some(id) =
+                        self.find_node(&NodeType::TacticPrimitive("RewriteLhs".into()))
+                    {
                         active.insert(id);
                     }
                 }
                 crate::verifier::kernel::Tactic::RewriteRhs(_) => {
-                    if let Some(id) = self.find_node(&NodeType::TacticPrimitive("RewriteRhs".into())) {
+                    if let Some(id) =
+                        self.find_node(&NodeType::TacticPrimitive("RewriteRhs".into()))
+                    {
                         active.insert(id);
                     }
                 }
                 crate::verifier::kernel::Tactic::Symmetry => {
-                    if let Some(id) = self.find_node(&NodeType::TacticPrimitive("Symmetry".into())) {
+                    if let Some(id) = self.find_node(&NodeType::TacticPrimitive("Symmetry".into()))
+                    {
                         active.insert(id);
                     }
                 }
                 crate::verifier::kernel::Tactic::Reflexivity => {
-                    if let Some(id) = self.find_node(&NodeType::TacticPrimitive("Reflexivity".into())) {
+                    if let Some(id) =
+                        self.find_node(&NodeType::TacticPrimitive("Reflexivity".into()))
+                    {
                         active.insert(id);
                     }
                 }
@@ -296,14 +397,20 @@ mod tests {
     use crate::verifier::fol::Equality;
 
     #[test]
-    fn test_master_graph_universe_creation() {
+    fn test_master_graph_universe_creation() -> Result<(), Box<dyn std::error::Error>> {
         let g = MasterMathGraph::default_universe();
         assert!(g.nodes.len() >= 18);
         assert!(g.edges.len() >= 20);
 
-        let dist_id = g.find_node(&NodeType::AxiomProperty("Distributivity".into())).unwrap();
-        let mul_id = g.find_node(&NodeType::Operator("*".into())).unwrap();
-        let and_id = g.find_node(&NodeType::Operator("&".into())).unwrap();
+        let dist_id = g
+            .find_node(&NodeType::AxiomProperty("Distributivity".into()))
+            .ok_or("Distributivity node not found")?;
+        let mul_id = g
+            .find_node(&NodeType::Operator("*".into()))
+            .ok_or("Mul node not found")?;
+        let and_id = g
+            .find_node(&NodeType::Operator("&".into()))
+            .ok_or("And node not found")?;
 
         // Check isomorphism connections
         let mul_neighbors: Vec<usize> = g.adjacency[&mul_id].iter().map(|(id, _, _)| *id).collect();
@@ -311,27 +418,39 @@ mod tests {
 
         assert!(mul_neighbors.contains(&dist_id));
         assert!(and_neighbors.contains(&dist_id));
+        Ok(())
     }
 
     #[test]
-    fn test_sparse_subgraph_activation_calculus() {
+    fn test_sparse_subgraph_activation_calculus() -> Result<(), Box<dyn std::error::Error>> {
         let g = MasterMathGraph::default_universe();
         let u = Term::var("u");
         let v = Term::var("v");
         // D(u * v) = D(u)*v + u*D(v)
         let lhs = Term::func("D", vec![Term::func("*", vec![u.clone(), v.clone()])]);
-        let rhs = Term::func("+", vec![
-            Term::func("*", vec![Term::func("D", vec![u]), v.clone()]),
-            Term::func("*", vec![Term::var("u"), Term::func("D", vec![v])]),
-        ]);
+        let rhs = Term::func(
+            "+",
+            vec![
+                Term::func("*", vec![Term::func("D", vec![u]), v.clone()]),
+                Term::func("*", vec![Term::var("u"), Term::func("D", vec![v])]),
+            ],
+        );
         let state = ProofState::new(Equality::new(lhs, rhs));
 
         let active = g.active_subgraph_nodes(&state, 1);
 
-        let diff_id = g.find_node(&NodeType::Operator("D".into())).unwrap();
-        let mul_id = g.find_node(&NodeType::Operator("*".into())).unwrap();
-        let add_id = g.find_node(&NodeType::Operator("+".into())).unwrap();
-        let not_id = g.find_node(&NodeType::Operator("!".into())).unwrap();
+        let diff_id = g
+            .find_node(&NodeType::Operator("D".into()))
+            .ok_or("Diff node not found")?;
+        let mul_id = g
+            .find_node(&NodeType::Operator("*".into()))
+            .ok_or("Mul node not found")?;
+        let add_id = g
+            .find_node(&NodeType::Operator("+".into()))
+            .ok_or("Add node not found")?;
+        let not_id = g
+            .find_node(&NodeType::Operator("!".into()))
+            .ok_or("Not node not found")?;
 
         // Calculus and algebraic operations must be active
         assert!(active.contains(&diff_id));
@@ -340,5 +459,6 @@ mod tests {
 
         // Boolean negation must remain dormant
         assert!(!active.contains(&not_id));
+        Ok(())
     }
 }

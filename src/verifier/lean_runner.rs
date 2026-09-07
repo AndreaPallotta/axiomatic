@@ -76,7 +76,8 @@ impl Lean4Validator {
                     };
                 }
 
-                if out.status.success() && !stderr.contains("error:") && !stdout.contains("error:") {
+                if out.status.success() && !stderr.contains("error:") && !stdout.contains("error:")
+                {
                     LeanValidationResult::Certified {
                         elapsed_ms: elapsed.as_secs_f64() * 1000.0,
                         lean_version,
@@ -177,20 +178,28 @@ mod tests {
             Tactic::RewriteLhs("add_zero".to_string()),
             "Rewrote LHS via [add_zero]: x = x".to_string(),
         ));
-        state.proof_history.push((
-            Tactic::Reflexivity,
-            "Solved #1: x = x via rfl".to_string(),
-        ));
+        state
+            .proof_history
+            .push((Tactic::Reflexivity, "Solved #1: x = x via rfl".to_string()));
 
         let res = Lean4Validator::validate_proof("test_lean_verified_thm", &state);
         if Lean4Validator::get_lean_version().is_some() {
             match res {
-                LeanValidationResult::Certified { elapsed_ms, ref lean_version } => {
+                LeanValidationResult::Certified {
+                    elapsed_ms,
+                    ref lean_version,
+                } => {
                     assert!(elapsed_ms >= 0.0);
                     assert!(!lean_version.is_empty());
                 }
-                LeanValidationResult::CompilerError { ref stderr, ref stdout } => {
-                    panic!("Expected Certified, got error: stderr={}, stdout={}", stderr, stdout);
+                LeanValidationResult::CompilerError {
+                    ref stderr,
+                    ref stdout,
+                } => {
+                    panic!(
+                        "Expected Certified, got error: stderr={}, stdout={}",
+                        stderr, stdout
+                    );
                 }
                 LeanValidationResult::LeanNotInstalled { .. } => {
                     panic!("Lean should be detected");
@@ -205,7 +214,8 @@ mod tests {
         let state = ProofState::new(Equality::new(x.clone(), x.clone()));
         let temp_dir = std::env::temp_dir().join("axiomatic_test_proofs");
 
-        let (res, path) = Lean4Validator::save_and_validate_proof("test_save_thm", &state, &temp_dir);
+        let (res, path) =
+            Lean4Validator::save_and_validate_proof("test_save_thm", &state, &temp_dir);
         assert!(path.exists());
         let content = std::fs::read_to_string(&path)?;
         assert!(content.contains("theorem test_save_thm"));
@@ -223,7 +233,10 @@ mod tests {
     fn test_lean_rejects_bad_proof() -> Result<(), Box<dyn std::error::Error>> {
         let temp_dir = std::env::temp_dir();
         let bad_path = temp_dir.join("test_bad_manual.lean");
-        std::fs::write(&bad_path, "theorem bad_thm (x y : Nat) : x = y := by\n  rfl\n")?;
+        std::fs::write(
+            &bad_path,
+            "theorem bad_thm (x y : Nat) : x = y := by\n  rfl\n",
+        )?;
 
         let res = Lean4Validator::validate_file(&bad_path);
         let _ = std::fs::remove_file(&bad_path);

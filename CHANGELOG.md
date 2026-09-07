@@ -2,6 +2,29 @@
 
 All notable changes to the **Axiomatic** project will be documented in this file.
 
+## [v0.3.0] - 2026-09-07
+
+### Lean 4 Formal Verification & System Improvements
+
+#### Lean 4 Formal Kernel Integration (`src/verifier/lean.rs`, `src/verifier/lean_runner.rs`)
+- Connected neurosymbolic MCTS proof discovery to the official Lean 4 formal proof assistant kernel.
+- Proofs discovered by MCTS are translated into Lean 4 source scripts, saved to `proofs/`, and verified by the `lean` compiler.
+- Replaced stubs with core prelude theorem mappings (`Nat` and `Bool`) and single-divergence `conv` AST navigation.
+- Preserved initial conjecture equality across proof states and structural induction branches.
+
+#### Proof Minimization & Dead-Tactic Pruning (`src/verifier/kernel.rs`, `src/search/mcts.rs`)
+- Added two-pass proof minimization (`ProofState::minimize`): cancels consecutive symmetry pairs and removes redundant tactic steps via verifier replay simulation.
+- Automated proof minimization in `MctsEngine::run_search`.
+
+#### Standalone Lean 4 Workspace Scaffolding (`src/verifier/lean_runner.rs`)
+- Added `ensure_lean_workspace` generating `proofs/lean-toolchain` (pinned to Lean 4.33.1) and `proofs/lakefile.lean` for direct VS Code and Lake integration.
+
+#### Multi-Domain Propositional Logic Translation (`src/verifier/lean.rs`, `src/main.rs`)
+- Added AST domain detection (`is_boolean_equality`) mapping boolean expressions to Lean 4 `Bool` primitives, library lemmas, and `try decide` closure.
+
+#### Lean 4 Formal Gate for Compounding Memory (`src/memory/database.rs`, `src/main.rs`)
+- Added `LemmaDatabase::record_and_certify` requiring formal Lean 4 kernel certification before admitting discovered lemmas into the active axiom database.
+
 ## [v0.2.0] - 2026-08-25
 
 ### Unified Mathematical Knowledge Graph & Sparse GNN Routing

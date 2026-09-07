@@ -6,7 +6,10 @@ use crate::verifier::kernel::ProofState;
 pub const EMBEDDING_DIM: usize = 32;
 
 /// Vectorizes a ProofState and its AST expressions using the Unified Master Mathematical Graph
-pub fn graph_vectorize_proof_state(gnn: &SparseGraphAttentionNetwork, state: &ProofState) -> Vec<f64> {
+pub fn graph_vectorize_proof_state(
+    gnn: &SparseGraphAttentionNetwork,
+    state: &ProofState,
+) -> Vec<f64> {
     if state.is_solved || state.open_goals.is_empty() {
         let mut vec = vec![0.0; EMBEDDING_DIM];
         vec[0] = 1.0;

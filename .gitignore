@@ -7,3 +7,8 @@ Thumbs.db
 .idea/
 models/*.tmp
 node_modules/
+.lake/
+**/lakefile.olean
+**/*.olean
+**/*.ilean
+.devkit/stash/

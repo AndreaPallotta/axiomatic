@@ -125,8 +125,8 @@ mod tests {
     use crate::verifier::fol::{Equality, Term};
 
     #[test]
-    fn test_sparse_gnn_forward_pass() {
-        let gnn = SparseGraphAttentionNetwork::new(16);
+    fn test_sparse_gnn_forward_pass() -> Result<(), Box<dyn std::error::Error>> {
+        let gnn = SparseGraphAttentionNetwork::new(32);
         let x = Term::var("x");
         let zero = Term::constant("0");
         let state = ProofState::new(Equality::new(
@@ -143,7 +143,11 @@ mod tests {
         assert!((total_weight - 1.0).abs() < 1e-5);
 
         // Verify that boolean operators were NOT activated
-        let not_id = gnn.master_graph.find_node(&NodeType::Operator("!".into())).unwrap();
+        let not_id = gnn
+            .master_graph
+            .find_node(&NodeType::Operator("!".into()))
+            .ok_or("Node ! not found")?;
         assert!(!activations.contains_key(&not_id));
+        Ok(())
     }
 }
