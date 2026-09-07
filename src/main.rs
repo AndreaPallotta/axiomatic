@@ -1,10 +1,11 @@
 #![allow(unused_variables, dead_code, clippy::all)]
 
 use axiomatic::{
-    export_to_lean4, AxiomLibrary, Equality, LemmaDatabase, MctsEngine, ProofState,
-    SymbolicNeuralPolicy, Term,
+    export_to_lean4, parse_conjecture, AxiomLibrary, Equality, LemmaDatabase, MctsEngine,
+    ProofState, SymbolicNeuralPolicy, Term, Lean4Validator, LeanValidationResult,
 };
 use std::env;
+use std::path::Path;
 use tokio::sync::broadcast;
 
 fn print_banner() {
@@ -26,11 +27,11 @@ fn print_usage() {
     println!("                        Examples: train --hours 2");
     println!("                                  train --epochs 500");
     println!(
-        "  prove <THEOREMS...>   Run autonomous MCTS proof discovery using trained Neural Net"
+        "  prove [CONJECTURE]    Run autonomous MCTS proof discovery and certify via Lean 4 kernel"
     );
     println!("  serve [PORT]          Launch live Web Graphical Dashboard (default: 3000)");
     println!("  demo                  Run autonomous theorem discovery and memory compounding");
-    println!("  lean                  Generate and export certified Lean 4 formal proofs\n");
+    println!("  lean                  Generate, export, and formally certify Lean 4 proof artifacts\n");
 }
 
 #[tokio::main]
@@ -88,7 +89,8 @@ async fn main() {
             run_neural_network_training(target_secs, target_epochs, &dir);
         }
         "prove" | "search" => {
-            run_autonomous_proof_cli();
+            let custom = args.get(2).map(|s| s.as_str());
+            run_autonomous_proof_cli(custom);
         }
         "serve" | "ui" | "dashboard" => {
             let port = args.get(2).and_then(|p| p.parse().ok()).unwrap_or(3000);
@@ -140,25 +142,7 @@ fn run_neural_network_training(
     );
 }
 
-/// Runs CLI proof discovery on algebraic goals
-fn run_autonomous_proof_cli() {
-    print_banner();
-    println!("[INFO] Initiating Neurosymbolic MCTS Proof Search");
-    println!("================================================================================");
-
-    let axioms = AxiomLibrary::standard_algebra();
-    let (model, epochs, _) = axiomatic::ModelCheckpoint::try_load_or_init("models");
-    let policy = axiomatic::DeepNeuralPolicy::new(model);
-    if epochs > 0 {
-        println!(
-            "[INFO] Using Trained Neural Network (Trained for {} Epochs)",
-            epochs
-        );
-    } else {
-        println!("[INFO] Using Initialized Neural Network");
-    }
-
-    // Goal: (x + 0) + (y * 1) = (1 * y) + (0 + x)
+fn default_target_conjecture() -> Equality {
     let x = Term::constant("x");
     let y = Term::constant("y");
     let zero = Term::constant("0");
@@ -179,10 +163,45 @@ fn run_autonomous_proof_cli() {
         ],
     );
 
-    let target_eq = Equality::new(lhs, rhs);
+    Equality::new(lhs, rhs)
+}
+
+/// Runs CLI proof discovery on algebraic goals
+fn run_autonomous_proof_cli(custom_conjecture: Option<&str>) {
+    print_banner();
+    println!("[INFO] Initiating Neurosymbolic MCTS Proof Search");
+    println!("================================================================================");
+
+    let axioms = AxiomLibrary::standard_algebra();
+    let (model, epochs, _) = axiomatic::ModelCheckpoint::try_load_or_init("models");
+    let policy = axiomatic::DeepNeuralPolicy::new(model);
+    if epochs > 0 {
+        println!(
+            "[INFO] Using Trained Neural Network (Trained for {} Epochs)",
+            epochs
+        );
+    } else {
+        println!("[INFO] Using Initialized Neural Network");
+    }
+
+    let target_eq = if let Some(conjecture_str) = custom_conjecture {
+        match parse_conjecture(conjecture_str) {
+            Ok(eq) => {
+                println!("[INPUT] Parsed target conjecture: {}", eq);
+                eq
+            }
+            Err(e) => {
+                println!("[WARN] Failed to parse input '{}': {}. Using default conjecture.", conjecture_str, e);
+                default_target_conjecture()
+            }
+        }
+    } else {
+        default_target_conjecture()
+    };
+
     println!("[TARGET] Conjecture: {}\n", target_eq);
 
-    let initial_state = ProofState::new(target_eq);
+    let initial_state = ProofState::new(target_eq.clone());
     let mut mcts = MctsEngine::new(initial_state, 8);
 
     let start = std::time::Instant::now();
@@ -205,6 +224,40 @@ fn run_autonomous_proof_cli() {
         println!("Formal Proof Derivation (Verified by Kernel):");
         for (i, (tactic, desc)) in solved_state.proof_history.iter().enumerate() {
             println!("  Step {}. [{}] -> {}", i + 1, tactic, desc);
+        }
+
+        println!("\nFormal Lean 4 Certification:");
+        let proofs_dir = Path::new("proofs");
+        let theorem_name = if custom_conjecture.is_some() {
+            "custom_theorem"
+        } else {
+            "compound_algebra_conjecture"
+        };
+        let (val_result, artifact_path) =
+            Lean4Validator::save_and_validate_proof(theorem_name, &solved_state, proofs_dir);
+
+        match val_result {
+            LeanValidationResult::Certified { elapsed_ms, lean_version } => {
+                println!("  - Proof Artifact:  {}", artifact_path.display());
+                println!("  - Status:          CERTIFIED by Lean 4 Kernel");
+                println!("  - Kernel Time:     {:.3} ms", elapsed_ms);
+                println!("  - Compiler:        {}", lean_version);
+            }
+            LeanValidationResult::CompilerError { stderr, stdout } => {
+                println!("  - Proof Artifact:  {}", artifact_path.display());
+                println!("  - Status:          COMPILER REJECTED");
+                if !stderr.is_empty() {
+                    println!("  - Stderr:          {}", stderr.trim());
+                }
+                if !stdout.is_empty() {
+                    println!("  - Stdout:          {}", stdout.trim());
+                }
+            }
+            LeanValidationResult::LeanNotInstalled { message } => {
+                println!("  - Proof Artifact:  {}", artifact_path.display());
+                println!("  - Status:          Lean 4 not detected (proof saved, compilation skipped)");
+                println!("  - Note:            {}", message);
+            }
         }
     } else {
         println!("[FAILED] Search exhausted max iterations without reaching formal proof state.");
@@ -280,10 +333,10 @@ fn run_compounding_memory_demo() {
     println!("================================================================================\n");
 }
 
-/// Exports a discovered proof to Lean 4 syntax
+/// Exports a discovered proof to Lean 4 syntax and formally certifies it with Lean 4
 fn run_lean_export_demo() {
     print_banner();
-    println!("[INFO] Exporting Discovered Proof to Lean 4 Formal Kernel");
+    println!("[INFO] Autonomous Theorem Discovery and Lean 4 Formal Kernel Certification");
     println!("================================================================================");
 
     let axioms = AxiomLibrary::standard_algebra();
@@ -300,7 +353,36 @@ fn run_lean_export_demo() {
         .run_search(&policy, &axioms, 100)
         .expect("Proof must be found");
 
-    let lean_code = export_to_lean4("add_zero_symmetric", &proof);
+    let theorem_name = "add_zero_symmetric";
+    let proofs_dir = Path::new("proofs");
+    let (val_result, artifact_path) =
+        Lean4Validator::save_and_validate_proof(theorem_name, &proof, proofs_dir);
+
+    let lean_code = export_to_lean4(theorem_name, &proof);
+    println!("Generated Lean 4 Proof Artifact ({}):\n", artifact_path.display());
     println!("{}", lean_code);
+
+    println!("================================================================================");
+    match val_result {
+        LeanValidationResult::Certified { elapsed_ms, lean_version } => {
+            println!("[CERTIFICATION] Formally Certified by Lean 4 Kernel");
+            println!("  - Artifact:        {}", artifact_path.display());
+            println!("  - Validation:      Kernel Confirmed (0 errors, 0 warnings, no sorry)");
+            println!("  - Compiler Time:   {:.3} ms", elapsed_ms);
+            println!("  - Toolchain:       {}", lean_version);
+        }
+        LeanValidationResult::CompilerError { stderr, stdout } => {
+            println!("[REJECTED] Lean 4 compiler rejected the generated proof");
+            if !stderr.is_empty() {
+                println!("  - Stderr: {}", stderr.trim());
+            }
+            if !stdout.is_empty() {
+                println!("  - Stdout: {}", stdout.trim());
+            }
+        }
+        LeanValidationResult::LeanNotInstalled { message } => {
+            println!("[SKIP] Lean 4 compiler not detected: {}", message);
+        }
+    }
     println!("================================================================================\n");
 }

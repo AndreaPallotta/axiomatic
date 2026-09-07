@@ -42,8 +42,10 @@ impl fmt::Display for Goal {
 /// The state of a mathematical proof at any point in the search tree
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProofState {
+    #[serde(default)]
+    pub initial_equality: Option<Equality>,
     pub open_goals: Vec<Goal>,
-    pub proof_history: Vec<(Tactic, String)>, // (tactic, result_description)
+    pub proof_history: Vec<(Tactic, String)>,
     pub is_solved: bool,
     pub depth: usize,
 }
@@ -51,6 +53,7 @@ pub struct ProofState {
 impl ProofState {
     pub fn new(initial_equality: Equality) -> Self {
         Self {
+            initial_equality: Some(initial_equality.clone()),
             open_goals: vec![Goal {
                 id: 1,
                 equality: initial_equality,

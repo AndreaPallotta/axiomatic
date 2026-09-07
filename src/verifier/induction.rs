@@ -52,6 +52,7 @@ impl InductionEngine {
         ));
 
         let mut next_state = ProofState {
+            initial_equality: state.initial_equality.clone(),
             open_goals: new_open_goals,
             proof_history: new_history,
             is_solved: false,

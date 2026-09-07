@@ -1,9 +1,9 @@
 use super::kernel::ProofState;
 use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Instant;
 
-/// Result of running Lean 4 compiler on generated code
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum LeanValidationResult {
     Certified {
@@ -19,13 +19,28 @@ pub enum LeanValidationResult {
     },
 }
 
-/// Runs official Lean 4 executable to formally check exported proofs
 pub struct Lean4Validator;
 
 impl Lean4Validator {
-    /// Detects if Lean 4 is installed
+    pub fn lean_command() -> Command {
+        if let Ok(out) = Command::new("lean").arg("--version").output() {
+            if out.status.success() {
+                return Command::new("lean");
+            }
+        }
+
+        if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
+            let p = PathBuf::from(local_app_data).join(r"Microsoft\WinGet\Links\lean.exe");
+            if p.exists() {
+                return Command::new(p);
+            }
+        }
+
+        Command::new("lean")
+    }
+
     pub fn get_lean_version() -> Option<String> {
-        let output = Command::new("lean").arg("--version").output().ok()?;
+        let output = Self::lean_command().arg("--version").output().ok()?;
         if output.status.success() {
             Some(String::from_utf8_lossy(&output.stdout).trim().to_string())
         } else {
@@ -33,8 +48,7 @@ impl Lean4Validator {
         }
     }
 
-    /// Validates a ProofState with official Lean 4 compiler
-    pub fn validate_proof(name: &str, state: &ProofState) -> LeanValidationResult {
+    pub fn validate_file(file_path: &Path) -> LeanValidationResult {
         let lean_version = match Self::get_lean_version() {
             Some(v) => v,
             None => {
@@ -44,37 +58,31 @@ impl Lean4Validator {
             }
         };
 
-        let lean_code = super::lean::export_to_lean4(name, state);
-        let temp_dir = std::env::temp_dir();
-        let temp_path = temp_dir.join(format!("{}_axiomatic.lean", name));
-
-        if let Err(e) = std::fs::write(&temp_path, &lean_code) {
-            return LeanValidationResult::CompilerError {
-                stderr: format!("Failed to write temporary file: {}", e),
-                stdout: String::new(),
-            };
-        }
-
         let start = Instant::now();
-        let output = Command::new("lean")
-            .arg(temp_path.to_str().unwrap_or("proof.lean"))
-            .output();
-
+        let output = Self::lean_command().arg(file_path).output();
         let elapsed = start.elapsed();
-        let _ = std::fs::remove_file(&temp_path);
 
         match output {
             Ok(out) => {
-                if out.status.success() {
+                let stderr = String::from_utf8_lossy(&out.stderr).to_string();
+                let stdout = String::from_utf8_lossy(&out.stdout).to_string();
+
+                if stdout.contains("warning: declaration uses `sorry`")
+                    || stderr.contains("warning: declaration uses `sorry`")
+                {
+                    return LeanValidationResult::CompilerError {
+                        stderr: "Proof contains unproven hypothesis (`sorry`)".to_string(),
+                        stdout,
+                    };
+                }
+
+                if out.status.success() && !stderr.contains("error:") && !stdout.contains("error:") {
                     LeanValidationResult::Certified {
                         elapsed_ms: elapsed.as_secs_f64() * 1000.0,
                         lean_version,
                     }
                 } else {
-                    LeanValidationResult::CompilerError {
-                        stderr: String::from_utf8_lossy(&out.stderr).to_string(),
-                        stdout: String::from_utf8_lossy(&out.stdout).to_string(),
-                    }
+                    LeanValidationResult::CompilerError { stderr, stdout }
                 }
             }
             Err(e) => LeanValidationResult::CompilerError {
@@ -83,24 +91,126 @@ impl Lean4Validator {
             },
         }
     }
+
+    pub fn validate_proof(name: &str, state: &ProofState) -> LeanValidationResult {
+        let temp_dir = std::env::temp_dir();
+        let temp_path = temp_dir.join(format!("{}_axiomatic.lean", name));
+
+        let lean_code = super::lean::export_to_lean4(name, state);
+        if let Err(e) = std::fs::write(&temp_path, &lean_code) {
+            return LeanValidationResult::CompilerError {
+                stderr: format!("Failed to write temporary file: {}", e),
+                stdout: String::new(),
+            };
+        }
+
+        let result = Self::validate_file(&temp_path);
+        let _ = std::fs::remove_file(&temp_path);
+        result
+    }
+
+    pub fn save_and_validate_proof(
+        name: &str,
+        state: &ProofState,
+        output_dir: &Path,
+    ) -> (LeanValidationResult, PathBuf) {
+        let file_path = output_dir.join(format!("{}.lean", name));
+        if let Err(e) = std::fs::create_dir_all(output_dir) {
+            return (
+                LeanValidationResult::CompilerError {
+                    stderr: format!("Failed to create output directory: {}", e),
+                    stdout: String::new(),
+                },
+                file_path,
+            );
+        }
+
+        let lean_code = super::lean::export_to_lean4(name, state);
+        if let Err(e) = std::fs::write(&file_path, &lean_code) {
+            return (
+                LeanValidationResult::CompilerError {
+                    stderr: format!("Failed to write proof file: {}", e),
+                    stdout: String::new(),
+                },
+                file_path,
+            );
+        }
+
+        let result = Self::validate_file(&file_path);
+        (result, file_path)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::verifier::fol::Equality;
+    use crate::verifier::fol::{Equality, Term};
+    use crate::verifier::kernel::Tactic;
 
     #[test]
-    fn test_lean_validator_fallback() {
-        let state = ProofState::new(Equality::new(
-            crate::verifier::fol::Term::constant("x"),
-            crate::verifier::fol::Term::constant("x"),
+    fn test_lean_validator_with_real_proof() {
+        let x = Term::var("x");
+        let zero = Term::constant("0");
+        let goal = Equality::new(Term::func("+", vec![x.clone(), zero.clone()]), x.clone());
+        let mut state = ProofState::new(goal);
+        state.proof_history.push((
+            Tactic::RewriteLhs("add_zero".to_string()),
+            "Rewrote LHS via [add_zero]: x = x".to_string(),
         ));
-        let res = Lean4Validator::validate_proof("test_thm", &state);
-        match res {
-            LeanValidationResult::Certified { .. }
-            | LeanValidationResult::CompilerError { .. }
-            | LeanValidationResult::LeanNotInstalled { .. } => {}
+        state.proof_history.push((
+            Tactic::Reflexivity,
+            "Solved #1: x = x via rfl".to_string(),
+        ));
+
+        let res = Lean4Validator::validate_proof("test_lean_verified_thm", &state);
+        if Lean4Validator::get_lean_version().is_some() {
+            match res {
+                LeanValidationResult::Certified { elapsed_ms, ref lean_version } => {
+                    assert!(elapsed_ms >= 0.0);
+                    assert!(!lean_version.is_empty());
+                }
+                LeanValidationResult::CompilerError { ref stderr, ref stdout } => {
+                    panic!("Expected Certified, got error: stderr={}, stdout={}", stderr, stdout);
+                }
+                LeanValidationResult::LeanNotInstalled { .. } => {
+                    panic!("Lean should be detected");
+                }
+            }
         }
+    }
+
+    #[test]
+    fn test_save_and_validate_proof_artifact() -> Result<(), Box<dyn std::error::Error>> {
+        let x = Term::var("x");
+        let state = ProofState::new(Equality::new(x.clone(), x.clone()));
+        let temp_dir = std::env::temp_dir().join("axiomatic_test_proofs");
+
+        let (res, path) = Lean4Validator::save_and_validate_proof("test_save_thm", &state, &temp_dir);
+        assert!(path.exists());
+        let content = std::fs::read_to_string(&path)?;
+        assert!(content.contains("theorem test_save_thm"));
+
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_dir(&temp_dir);
+
+        if Lean4Validator::get_lean_version().is_some() {
+            assert!(matches!(res, LeanValidationResult::Certified { .. }));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_lean_rejects_bad_proof() -> Result<(), Box<dyn std::error::Error>> {
+        let temp_dir = std::env::temp_dir();
+        let bad_path = temp_dir.join("test_bad_manual.lean");
+        std::fs::write(&bad_path, "theorem bad_thm (x y : Nat) : x = y := by\n  rfl\n")?;
+
+        let res = Lean4Validator::validate_file(&bad_path);
+        let _ = std::fs::remove_file(&bad_path);
+
+        if Lean4Validator::get_lean_version().is_some() {
+            assert!(matches!(res, LeanValidationResult::CompilerError { .. }));
+        }
+        Ok(())
     }
 }

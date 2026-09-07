@@ -1,6 +1,6 @@
 ﻿# Codebase Map
-Generated: 2026-08-25 15:22:07
-Commit: 4ed1952 docs: add live command center screenshot to README and polish toolbar
+Generated: 2026-09-07 18:41:18
+Commit: 5b276f6 feat(gnn): implement unified master mathematical graph with sparse attention routing (v0.2.0)
 
 This file is a compact index of the codebase for AI agents to understand project structure without full recursive file scans.
 
@@ -27,7 +27,7 @@ See [DEPS.md](file:///c:/Users/andre/OneDrive/Desktop/projects/agent-devkit/DEPS
 - **src/generator/policy.rs** (133 lines)
 - **src/generator/prompt.rs** (22 lines)
 - **src/lib.rs** (30 lines)
-- **src/main.rs** (307 lines)
+- **src/main.rs** (389 lines)
 - **src/memory/database.rs** (68 lines)
 - **src/memory/mod.rs** (8 lines)
 - **src/memory/vectordb.rs** (177 lines)
@@ -49,10 +49,10 @@ See [DEPS.md](file:///c:/Users/andre/OneDrive/Desktop/projects/agent-devkit/DEPS
 - **src/theory/mod.rs** (8 lines)
 - **src/verifier/exporter.rs** (136 lines)
 - **src/verifier/fol.rs** (277 lines)
-- **src/verifier/induction.rs** (93 lines)
-- **src/verifier/kernel.rs** (786 lines)
-- **src/verifier/lean.rs** (76 lines)
-- **src/verifier/lean_runner.rs** (107 lines)
+- **src/verifier/induction.rs** (94 lines)
+- **src/verifier/kernel.rs** (789 lines)
+- **src/verifier/lean.rs** (233 lines)
+- **src/verifier/lean_runner.rs** (217 lines)
 - **src/verifier/mod.rs** (16 lines)
 - **src/verifier/parser.rs** (287 lines)
 - **src/visualizer/mod.rs** (4 lines)
@@ -166,17 +166,19 @@ See [DEPS.md](file:///c:/Users/andre/OneDrive/Desktop/projects/agent-devkit/DEPS
 - pub enum Tactic { [L7]
 - pub struct Goal { [L31]
 - pub struct ProofState { [L44]
-- pub enum MathDomain { [L80]
-- pub struct AxiomLibrary { [L102]
-- pub struct FormalVerifier; [L563]
+- pub enum MathDomain { [L83]
+- pub struct AxiomLibrary { [L105]
+- pub struct FormalVerifier; [L566]
 
 ### src/verifier/lean.rs
 - pub fn term_to_lean(term: &Term) -> String { [L5]
-- pub fn export_to_lean4(theorem_name: &str, final_state: &ProofState) -> String { [L28]
+- pub fn map_rule_to_lean(rule: &str) -> String { [L28]
+- pub fn export_to_lean4(theorem_name: &str, final_state: &ProofState) -> String { [L71]
+- pub fn export_equality_to_lean4( [L80]
 
 ### src/verifier/lean_runner.rs
 - pub enum LeanValidationResult { [L8]
-- pub struct Lean4Validator; [L23]
+- pub struct Lean4Validator; [L22]
 
 ### src/verifier/parser.rs
 - pub fn parse_conjecture(input: &str) -> Result<Equality, String> { [L244]
