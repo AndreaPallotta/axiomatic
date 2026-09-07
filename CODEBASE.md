@@ -1,6 +1,6 @@
 ﻿# Codebase Map
-Generated: 2026-09-07 19:41:48
-Commit: c5e0ab2 feat(verifier): integrate Lean 4 kernel verification and proof artifact emission
+Generated: 2026-09-07 19:42:57
+Commit: 611c50c feat(verifier): add proof minimization, lean workspace scaffolding, boolean domain, and memory gate
 
 This file is a compact index of the codebase for AI agents to understand project structure without full recursive file scans.
 
@@ -13,7 +13,7 @@ See [DEPS.md](file:///c:/Users/andre/OneDrive/Desktop/projects/agent-devkit/DEPS
 - **AGENT.md** (33 lines)
 - **CHANGELOG.md** (33 lines)
 - **CLAUDE.md** (30 lines)
-- **CODEBASE.md** (190 lines)
+- **CODEBASE.md** (192 lines)
 - **DECISIONS.md** (31 lines)
 - **DEPS.md** (30 lines)
 - **docker-compose.yml** (12 lines)
