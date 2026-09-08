@@ -39,8 +39,9 @@ jobs:
 
       - name: Generate Showcase Demos
         run: |
-          cargo run --release -- export-trace "(a + 0) = (0 + a)" --out dist --html --name "add_zero_comm"
-          cargo run --release -- export-trace "(a & 1) = a" --out dist/bool --html --name "bool_identity"
+          cargo run --release -- export-trace "(((x + 0) * 1) + ((y * 1) + 0)) = ((0 + y) + (x * 1))" --out dist --html --name "nested_algebra_reduction" --iterations 400
+          cargo run --release -- export-trace "((x + 0) + (y * 1)) = ((1 * y) + (0 + x))" --out dist/compound --html --name "compound_algebra" --iterations 200
+          cargo run --release -- export-trace "((a & 1) & (b | 0)) = ((0 | b) & (1 & a))" --out dist/bool --html --name "boolean_compound_symmetry" --iterations 200
           echo "axiomatic.andreapallotta.dev" > dist/CNAME
 
       - name: Upload Pages Artifact

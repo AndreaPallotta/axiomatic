@@ -212,6 +212,38 @@ fn generate_html_showcase(json_data: &str, trace: &StaticProofTrace) -> String {
             color: var(--text-secondary);
             font-family: var(--font-code);
         }}
+        .demo-nav {{
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }}
+        .demo-label {{
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary);
+            margin-right: 4px;
+        }}
+        .demo-chip {{
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 500;
+            text-decoration: none;
+            color: var(--text-secondary);
+            background: #0d1117;
+            border: 1px solid var(--surface-border);
+            transition: all 0.15s ease;
+        }}
+        .demo-chip:hover {{
+            color: var(--text-main);
+            border-color: var(--accent-primary);
+        }}
+        .demo-chip.active {{
+            color: var(--accent-primary);
+            border-color: var(--accent-primary);
+            background: rgba(88, 166, 255, 0.1);
+        }}
         .badges {{
             display: flex;
             align-items: center;
@@ -399,6 +431,12 @@ fn generate_html_showcase(json_data: &str, trace: &StaticProofTrace) -> String {
                 <p>{conjecture}</p>
             </div>
         </div>
+        <nav class="demo-nav">
+            <span class="demo-label">Showcases:</span>
+            <a id="demoLinkMain" href="./" class="demo-chip">Nested Ring (1,670 Nodes)</a>
+            <a id="demoLinkCompound" href="./compound/" class="demo-chip">Compound Algebra</a>
+            <a id="demoLinkBool" href="./bool/" class="demo-chip">Boolean Logic</a>
+        </nav>
         <div class="badges">
             <span class="badge {status_badge_class}">{status_text}</span>
             {certified_badge}
@@ -542,23 +580,60 @@ fn generate_html_showcase(json_data: &str, trace: &StaticProofTrace) -> String {
         }}
         populateTactics();
 
+        const nodeMap = new Map();
+        nodes.forEach(n => nodeMap.set(n.id, n));
+
         function computeTreeLayout() {{
-            const levels = [];
-            nodes.forEach(node => {{
-                const d = node.depth || 0;
-                while (levels.length <= d) levels.push([]);
-                levels[d].push(node);
+            nodes.forEach(n => {{
+                if (n.children_ids && n.children_ids.length > 0) {{
+                    n.children_ids.sort((a, b) => {{
+                        const isProvenA = provenPathSet.has(a) ? 1 : 0;
+                        const isProvenB = provenPathSet.has(b) ? 1 : 0;
+                        if (isProvenA !== isProvenB) return isProvenB - isProvenA;
+                        const nodeA = nodeMap.get(a);
+                        const nodeB = nodeMap.get(b);
+                        const vA = nodeA ? nodeA.visit_count : 0;
+                        const vB = nodeB ? nodeB.visit_count : 0;
+                        return vB - vA;
+                    }});
+                }}
             }});
 
-            const xSpacing = 160;
-            const ySpacing = 65;
+            const xSpacing = 220;
+            const ySpacing = 36;
+            let nextY = 0;
 
-            levels.forEach((levelNodes, depth) => {{
-                const totalHeight = (levelNodes.length - 1) * ySpacing;
-                levelNodes.forEach((node, idx) => {{
-                    node.x = depth * xSpacing + 60;
-                    node.y = (idx * ySpacing) - (totalHeight / 2) + 200;
-                }});
+            function layoutSubtree(nodeId) {{
+                const node = nodeMap.get(nodeId);
+                if (!node) return;
+
+                node.x = (node.depth || 0) * xSpacing + 80;
+
+                const children = (node.children_ids || [])
+                    .map(cid => nodeMap.get(cid))
+                    .filter(Boolean);
+
+                if (children.length === 0) {{
+                    node.y = nextY;
+                    nextY += ySpacing;
+                }} else {{
+                    children.forEach(c => layoutSubtree(c.id));
+                    const firstChild = children[0];
+                    const lastChild = children[children.length - 1];
+                    node.y = (firstChild.y + lastChild.y) / 2;
+                }}
+            }}
+
+            if (nodes.length > 0) {{
+                layoutSubtree(0);
+            }}
+
+            nodes.forEach(node => {{
+                if (node.x === undefined || node.y === undefined) {{
+                    node.x = (node.depth || 0) * xSpacing + 80;
+                    node.y = nextY;
+                    nextY += ySpacing;
+                }}
             }});
         }}
         computeTreeLayout();
@@ -569,13 +644,29 @@ fn generate_html_showcase(json_data: &str, trace: &StaticProofTrace) -> String {
             ctx.translate(panX, panY);
             ctx.scale(zoom, zoom);
 
-            const nodeMap = new Map();
-            nodes.forEach(n => nodeMap.set(n.id, n));
+            const viewLeft = -panX / zoom - 120;
+            const viewRight = (canvas.width - panX) / zoom + 120;
+            const viewTop = -panY / zoom - 120;
+            const viewBottom = (canvas.height - panY) / zoom + 120;
+
+            function isPointInView(x, y, margin = 60) {{
+                return x >= viewLeft - margin && x <= viewRight + margin &&
+                       y >= viewTop - margin && y <= viewBottom + margin;
+            }}
 
             nodes.forEach(node => {{
                 if (node.parent_id !== null && nodeMap.has(node.parent_id)) {{
                     const parent = nodeMap.get(node.parent_id);
                     const isProvenEdge = provenPathSet.has(node.id) && provenPathSet.has(parent.id);
+
+                    if (!isProvenEdge) {{
+                        if ((parent.x < viewLeft && node.x < viewLeft) ||
+                            (parent.x > viewRight && node.x > viewRight) ||
+                            (parent.y < viewTop && node.y < viewTop) ||
+                            (parent.y > viewBottom && node.y > viewBottom)) {{
+                            return;
+                        }}
+                    }}
 
                     ctx.beginPath();
                     ctx.strokeStyle = isProvenEdge ? '#3fb950' : '#30363d';
@@ -586,7 +677,7 @@ fn generate_html_showcase(json_data: &str, trace: &StaticProofTrace) -> String {
                     ctx.bezierCurveTo(midX, parent.y, midX, node.y, node.x, node.y);
                     ctx.stroke();
 
-                    if (node.applied_tactic) {{
+                    if (node.applied_tactic && (isProvenEdge || isPointInView(midX, (parent.y + node.y) / 2))) {{
                         const tacticStr = typeof node.applied_tactic === 'string'
                             ? node.applied_tactic
                             : (node.applied_tactic.RewriteLhs ? `rw [${{node.applied_tactic.RewriteLhs}}]` : (node.applied_tactic.RewriteRhs ? `nth_rw [${{node.applied_tactic.RewriteRhs}}]` : JSON.stringify(node.applied_tactic)));
@@ -612,11 +703,16 @@ fn generate_html_showcase(json_data: &str, trace: &StaticProofTrace) -> String {
             }});
 
             nodes.forEach(node => {{
-                ctx.beginPath();
                 const radius = Math.min(22, Math.max(14, 14 + Math.log2(node.visit_count + 1) * 2.2));
+                const isProven = node.is_proven || provenPathSet.has(node.id);
+
+                if (!isProven && !isPointInView(node.x, node.y, radius + 10)) {{
+                    return;
+                }}
+
+                ctx.beginPath();
                 ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI);
 
-                const isProven = node.is_proven || provenPathSet.has(node.id);
                 const isSelected = node.id === selectedNodeId;
 
                 if (isProven) {{
@@ -693,6 +789,53 @@ fn generate_html_showcase(json_data: &str, trace: &StaticProofTrace) -> String {
             `;
         }}
 
+        function focusProvenPath() {{
+            if (!trace.proof_path_node_ids || trace.proof_path_node_ids.length === 0) {{
+                panX = 80;
+                panY = canvas.height / 2;
+                zoom = 1.0;
+                render();
+                return;
+            }}
+
+            const pathNodes = trace.proof_path_node_ids
+                .map(id => nodeMap.get(id))
+                .filter(Boolean);
+
+            if (pathNodes.length === 0) return;
+
+            let minX = Infinity, maxX = -Infinity;
+            let minY = Infinity, maxY = -Infinity;
+
+            pathNodes.forEach(n => {{
+                if (n.x < minX) minX = n.x;
+                if (n.x > maxX) maxX = n.x;
+                if (n.y < minY) minY = n.y;
+                if (n.y > maxY) maxY = n.y;
+            }});
+
+            const pathWidth = maxX - minX + 160;
+            const pathHeight = maxY - minY + 160;
+
+            const scaleX = (canvas.width - 100) / pathWidth;
+            const scaleY = (canvas.height - 100) / pathHeight;
+            const targetZoom = Math.max(0.35, Math.min(1.2, Math.min(scaleX, scaleY)));
+
+            const centerX = (minX + maxX) / 2;
+            const centerY = (minY + maxY) / 2;
+
+            zoom = targetZoom;
+            panX = canvas.width / 2 - centerX * zoom;
+            panY = canvas.height / 2 - centerY * zoom;
+
+            const targetNode = trace.proven_node_id !== null ? nodeMap.get(trace.proven_node_id) : pathNodes[0];
+            if (targetNode) {{
+                selectedNodeId = targetNode.id;
+                updateInspector(targetNode);
+            }}
+            render();
+        }}
+
         canvas.addEventListener('mousedown', e => {{
             isDragging = true;
             startX = e.clientX - panX;
@@ -743,29 +886,34 @@ fn generate_html_showcase(json_data: &str, trace: &StaticProofTrace) -> String {
         document.getElementById('btnZoomIn').onclick = () => {{ zoom = Math.min(3.0, zoom * 1.25); render(); }};
         document.getElementById('btnZoomOut').onclick = () => {{ zoom = Math.max(0.15, zoom * 0.8); render(); }};
         document.getElementById('btnResetView').onclick = () => {{ panX = 100; panY = 150; zoom = 1.0; render(); }};
-        document.getElementById('btnCenterProven').onclick = () => {{
-            if (trace.proven_node_id !== null) {{
-                const pNode = nodes.find(n => n.id === trace.proven_node_id);
-                if (pNode) {{
-                    panX = canvas.width / 2 - pNode.x * zoom;
-                    panY = canvas.height / 2 - pNode.y * zoom;
-                    selectedNodeId = pNode.id;
-                    updateInspector(pNode);
-                    render();
-                }}
-            }}
-        }};
+        document.getElementById('btnCenterProven').onclick = () => {{ focusProvenPath(); }};
 
         function copyCode(id) {{
             const text = document.getElementById(id).textContent;
             navigator.clipboard.writeText(text);
         }}
 
-        resize();
-        if (nodes.length > 0) {{
-            const initNode = nodes.find(n => n.id === selectedNodeId) || nodes[0];
-            updateInspector(initNode);
+        const currentPath = window.location.pathname;
+        const isSubdir = currentPath.includes('/compound') || currentPath.includes('/bool');
+        const rootPrefix = isSubdir ? '../' : './';
+        const linkMain = document.getElementById('demoLinkMain');
+        const linkCompound = document.getElementById('demoLinkCompound');
+        const linkBool = document.getElementById('demoLinkBool');
+        if (linkMain && linkCompound && linkBool) {{
+            linkMain.href = rootPrefix;
+            linkCompound.href = rootPrefix + 'compound/';
+            linkBool.href = rootPrefix + 'bool/';
+            if (currentPath.includes('/compound')) {{
+                linkCompound.classList.add('active');
+            }} else if (currentPath.includes('/bool')) {{
+                linkBool.classList.add('active');
+            }} else {{
+                linkMain.classList.add('active');
+            }}
         }}
+
+        resize();
+        focusProvenPath();
     </script>
 </body>
 </html>
