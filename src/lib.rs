@@ -24,6 +24,7 @@ pub use theory::{CurriculumController, DifficultyLevel, InventedTheorem, TheoryI
 pub use verifier::{
     export_equality_to_lean4, export_to_lean4, is_boolean_equality, parse_conjecture, term_to_lean,
     AxiomLibrary, Equality, FormalVerifier, Goal, InductionEngine, Lean4Validator,
-    LeanValidationResult, MultiFormatExporter, ProofState, Tactic, Term,
+    LeanValidationResult, MultiFormatExporter, ProofState, StaticProofTrace, Tactic, Term,
+    TraceExporter,
 };
 pub use visualizer::{start_visualizer_server, EngineController};

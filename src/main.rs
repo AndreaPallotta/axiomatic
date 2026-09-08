@@ -3,6 +3,7 @@
 use axiomatic::{
     export_to_lean4, parse_conjecture, AxiomLibrary, Equality, Lean4Validator,
     LeanValidationResult, LemmaDatabase, MctsEngine, ProofState, SymbolicNeuralPolicy, Term,
+    TraceExporter,
 };
 use std::env;
 use std::path::Path;
@@ -32,8 +33,14 @@ fn print_usage() {
     println!("  serve [PORT]          Launch live Web Graphical Dashboard (default: 3000)");
     println!("  demo                  Run autonomous theorem discovery and memory compounding");
     println!(
-        "  lean                  Generate, export, and formally certify Lean 4 proof artifacts\n"
+        "  lean                  Generate, export, and formally certify Lean 4 proof artifacts"
     );
+    println!("  export-trace [CONJECTURE] [OPTIONS]");
+    println!("                        Export standalone static proof trace and interactive showcase HTML");
+    println!(
+        "                        Options: --out <DIR>, --html, --iterations <N>, --name <NAME>"
+    );
+    println!("                        Examples: export-trace \"(a + 0) = (0 + a)\" --out showcase --html\n");
 }
 
 #[tokio::main]
@@ -103,6 +110,53 @@ async fn main() {
         }
         "lean" => {
             run_lean_export_demo();
+        }
+        "export-trace" | "trace" => {
+            let mut conjecture: Option<String> = None;
+            let mut out_dir = "showcase".to_string();
+            let mut emit_html = false;
+            let mut iterations = 150;
+            let mut name = "showcase_theorem".to_string();
+
+            let mut i = 2;
+            while i < args.len() {
+                match args[i].as_str() {
+                    "--out" | "-o" => {
+                        if let Some(val) = args.get(i + 1) {
+                            out_dir = val.clone();
+                            i += 1;
+                        }
+                    }
+                    "--html" => {
+                        emit_html = true;
+                    }
+                    "--iterations" | "-n" => {
+                        if let Some(val) = args.get(i + 1).and_then(|v| v.parse::<usize>().ok()) {
+                            iterations = val;
+                            i += 1;
+                        }
+                    }
+                    "--name" => {
+                        if let Some(val) = args.get(i + 1) {
+                            name = val.clone();
+                            i += 1;
+                        }
+                    }
+                    arg if !arg.starts_with('-') && conjecture.is_none() => {
+                        conjecture = Some(arg.to_string());
+                    }
+                    _ => {}
+                }
+                i += 1;
+            }
+
+            run_export_trace_cli(
+                conjecture.as_deref(),
+                &out_dir,
+                emit_html,
+                iterations,
+                &name,
+            );
         }
         _ => {
             print_usage();
@@ -424,5 +478,85 @@ fn run_lean_export_demo() {
             println!("[SKIP] Lean 4 compiler not detected: {}", message);
         }
     }
+    println!("================================================================================\n");
+}
+
+fn run_export_trace_cli(
+    custom_conjecture: Option<&str>,
+    out_dir_str: &str,
+    emit_html: bool,
+    max_iterations: usize,
+    theorem_name: &str,
+) {
+    print_banner();
+    println!("[INFO] Exporting Static Proof Trace & Showcase");
+    println!("================================================================================");
+
+    let (target_eq, is_bool) = if let Some(conjecture_str) = custom_conjecture {
+        match parse_conjecture(conjecture_str) {
+            Ok(eq) => {
+                println!("[INPUT] Parsed target conjecture: {}", eq);
+                let is_b = axiomatic::is_boolean_equality(&eq);
+                (eq, is_b)
+            }
+            Err(e) => {
+                println!(
+                    "[WARN] Failed to parse input '{}': {}. Using default conjecture.",
+                    conjecture_str, e
+                );
+                (default_target_conjecture(), false)
+            }
+        }
+    } else {
+        (default_target_conjecture(), false)
+    };
+
+    let domain_name = if is_bool {
+        "Propositional Boolean Logic"
+    } else {
+        "Abstract Algebra"
+    };
+
+    let axioms = if is_bool {
+        AxiomLibrary::boolean_logic()
+    } else {
+        AxiomLibrary::standard_algebra()
+    };
+
+    let policy = SymbolicNeuralPolicy::new();
+    let root_state = ProofState::new(target_eq.clone());
+    let mut mcts = MctsEngine::new(root_state, 8);
+
+    println!(
+        "[SEARCH] Running MCTS with budget of {} iterations...",
+        max_iterations
+    );
+    let _ = mcts.run_search(&policy, &axioms, max_iterations);
+    let snapshot = mcts.snapshot();
+
+    println!(
+        "[SEARCH] Complete. Total nodes: {}, Proven: {}",
+        snapshot.nodes.len(),
+        snapshot.proven_node_id.is_some()
+    );
+
+    let trace =
+        TraceExporter::create_trace(theorem_name, &target_eq.to_string(), domain_name, snapshot);
+
+    let out_dir = Path::new(out_dir_str);
+    let json_file = out_dir.join("trace.json");
+    match TraceExporter::export_json(&trace, &json_file) {
+        Ok(_) => println!("  [OK] Exported JSON Trace:   {}", json_file.display()),
+        Err(e) => println!("  [ERROR] Failed to export JSON trace: {}", e),
+    }
+
+    if emit_html {
+        let html_file = out_dir.join("index.html");
+        match TraceExporter::export_standalone_html(&trace, &html_file) {
+            Ok(_) => println!("  [OK] Exported Standalone HTML: {}", html_file.display()),
+            Err(e) => println!("  [ERROR] Failed to export HTML showcase: {}", e),
+        }
+    }
+
     println!("================================================================================\n");
 }

@@ -1,6 +1,6 @@
 ﻿# Codebase Map
-Generated: 2026-09-07 19:47:52
-Commit: 9aac109 chore(release): prepare v0.3.0 release and update gitignore
+Generated: 2026-09-08 09:49:24
+Commit: 2eb4497 feat(verifier): implement static proof trace export and standalone showcase viewer
 
 This file is a compact index of the codebase for AI agents to understand project structure without full recursive file scans.
 
@@ -13,7 +13,7 @@ See [DEPS.md](file:///c:/Users/andre/OneDrive/Desktop/projects/agent-devkit/DEPS
 - **AGENT.md** (33 lines)
 - **CHANGELOG.md** (56 lines)
 - **CLAUDE.md** (30 lines)
-- **CODEBASE.md** (192 lines)
+- **CODEBASE.md** (199 lines)
 - **DECISIONS.md** (31 lines)
 - **DEPS.md** (30 lines)
 - **docker-compose.yml** (12 lines)
@@ -23,11 +23,13 @@ See [DEPS.md](file:///c:/Users/andre/OneDrive/Desktop/projects/agent-devkit/DEPS
 - **README.md** (124 lines)
 - **scripts/capture_docs.js** (95 lines)
 - **scripts/hf_sync.py** (60 lines)
+- **showcase/bool/trace.json** (274 lines)
+- **showcase/trace.json** (472 lines)
 - **src/generator/mod.rs** (6 lines)
 - **src/generator/policy.rs** (133 lines)
 - **src/generator/prompt.rs** (22 lines)
-- **src/lib.rs** (30 lines)
-- **src/main.rs** (429 lines)
+- **src/lib.rs** (31 lines)
+- **src/main.rs** (563 lines)
 - **src/memory/database.rs** (126 lines)
 - **src/memory/mod.rs** (8 lines)
 - **src/memory/vectordb.rs** (177 lines)
@@ -53,8 +55,9 @@ See [DEPS.md](file:///c:/Users/andre/OneDrive/Desktop/projects/agent-devkit/DEPS
 - **src/verifier/kernel.rs** (870 lines)
 - **src/verifier/lean.rs** (337 lines)
 - **src/verifier/lean_runner.rs** (262 lines)
-- **src/verifier/mod.rs** (16 lines)
+- **src/verifier/mod.rs** (18 lines)
 - **src/verifier/parser.rs** (287 lines)
+- **src/verifier/trace.rs** (851 lines)
 - **src/visualizer/mod.rs** (4 lines)
 - **src/visualizer/server.rs** (2198 lines)
 
@@ -184,6 +187,10 @@ See [DEPS.md](file:///c:/Users/andre/OneDrive/Desktop/projects/agent-devkit/DEPS
 
 ### src/verifier/parser.rs
 - pub fn parse_conjecture(input: &str) -> Result<Equality, String> { [L244]
+
+### src/verifier/trace.rs
+- pub struct StaticProofTrace { [L11]
+- pub struct TraceExporter; [L31]
 
 ### src/visualizer/server.rs
 - pub struct TargetProbeResult { [L37]

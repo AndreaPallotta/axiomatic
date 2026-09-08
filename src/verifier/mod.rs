@@ -5,6 +5,7 @@ pub mod kernel;
 pub mod lean;
 pub mod lean_runner;
 pub mod parser;
+pub mod trace;
 
 pub use exporter::MultiFormatExporter;
 pub use fol::{apply_rewrite, unify, Equality, Term};
@@ -13,3 +14,4 @@ pub use kernel::{AxiomLibrary, FormalVerifier, Goal, ProofState, Tactic};
 pub use lean::{export_equality_to_lean4, export_to_lean4, is_boolean_equality, term_to_lean};
 pub use lean_runner::{Lean4Validator, LeanValidationResult};
 pub use parser::parse_conjecture;
+pub use trace::{StaticProofTrace, TraceExporter};
