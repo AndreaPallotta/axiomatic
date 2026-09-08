@@ -1,6 +1,6 @@
 ﻿# Codebase Map
-Generated: 2026-09-08 10:07:17
-Commit: af63296 ci(pages): add GitHub Pages showcase deployment workflow and CNAME
+Generated: 2026-09-08 10:48:51
+Commit: 4294cf1 ci(pages): add GitHub Pages showcase deployment workflow and CNAME
 
 This file is a compact index of the codebase for AI agents to understand project structure without full recursive file scans.
 
@@ -12,9 +12,9 @@ See [DEPS.md](file:///c:/Users/andre/OneDrive/Desktop/projects/agent-devkit/DEPS
 - **.github/workflows/pages.yml** (62 lines)
 - **.github/workflows/release.yml** (125 lines)
 - **AGENT.md** (33 lines)
-- **CHANGELOG.md** (56 lines)
+- **CHANGELOG.md** (70 lines)
 - **CLAUDE.md** (30 lines)
-- **CODEBASE.md** (199 lines)
+- **CODEBASE.md** (200 lines)
 - **DECISIONS.md** (31 lines)
 - **DEPS.md** (30 lines)
 - **docker-compose.yml** (12 lines)

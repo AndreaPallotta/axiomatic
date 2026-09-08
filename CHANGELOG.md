@@ -2,6 +2,20 @@
 
 All notable changes to the **Axiomatic** project will be documented in this file.
 
+## [v0.3.1] - 2026-09-08
+
+### Static Proof Trace & GitHub Pages Deployment Pipeline
+
+#### Static Trace Exporter (`src/verifier/trace.rs`, `src/main.rs`)
+- Added `StaticProofTrace` capturing full MCTS exploration graphs, proven root-to-leaf paths, tactics, and multi-format proof scripts (Lean 4, Coq, AMS-LaTeX).
+- Added `TraceExporter::export_json` and `TraceExporter::export_standalone_html` for zero-backend static hosting.
+- Added `axiomatic export-trace` CLI command with configurable budgets, domain auto-detection, and artifact directory output.
+
+#### GitHub Pages Deployment Workflow (`.github/workflows/pages.yml`)
+- Automated CI showcase builder generating arithmetic and boolean interactive showcases.
+- Integrated official Lean 4 toolchain via `elan` to certify emitted proof scripts in CI.
+- Added automated `dist/CNAME` emission for custom subdomain `axiomatic.andreapallotta.dev`.
+
 ## [v0.3.0] - 2026-09-07
 
 ### Lean 4 Formal Verification & System Improvements
