@@ -402,6 +402,7 @@ fn generate_html_showcase(json_data: &str, trace: &StaticProofTrace) -> String {
         <div class="badges">
             <span class="badge {status_badge_class}">{status_text}</span>
             {certified_badge}
+            <a href="https://github.com/AndreaPallotta/axiomatic" target="_blank" rel="noopener" class="badge badge-muted" style="text-decoration:none;">GitHub &nearr;</a>
         </div>
     </header>
 

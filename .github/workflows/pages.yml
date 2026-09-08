@@ -1,0 +1,61 @@
+name: Deploy Showcase to GitHub Pages
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build-showcase:
+    name: Build Showcase Artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Setup Lean 4 toolchain
+        run: |
+          curl -sSf https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain stable
+          echo "$HOME/.elan/bin" >> $GITHUB_PATH
+
+      - name: Verify Lean 4 installation
+        run: |
+          lean --version
+
+      - name: Generate Showcase Demos
+        run: |
+          cargo run --release -- export-trace "(a + 0) = (0 + a)" --out dist --html --name "add_zero_comm"
+          cargo run --release -- export-trace "(a & 1) = a" --out dist/bool --html --name "bool_identity"
+          echo "axiomatic.andreapallotta.dev" > dist/CNAME
+
+      - name: Upload Pages Artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: './dist'
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build-showcase
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

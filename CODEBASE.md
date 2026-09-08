@@ -1,6 +1,6 @@
 ﻿# Codebase Map
-Generated: 2026-09-08 09:49:24
-Commit: 2eb4497 feat(verifier): implement static proof trace export and standalone showcase viewer
+Generated: 2026-09-08 10:07:17
+Commit: af63296 ci(pages): add GitHub Pages showcase deployment workflow and CNAME
 
 This file is a compact index of the codebase for AI agents to understand project structure without full recursive file scans.
 
@@ -9,6 +9,7 @@ See [DEPS.md](file:///c:/Users/andre/OneDrive/Desktop/projects/agent-devkit/DEPS
 
 ## File Index
 - **.github/workflows/ci.yml** (43 lines)
+- **.github/workflows/pages.yml** (62 lines)
 - **.github/workflows/release.yml** (125 lines)
 - **AGENT.md** (33 lines)
 - **CHANGELOG.md** (56 lines)
@@ -57,7 +58,7 @@ See [DEPS.md](file:///c:/Users/andre/OneDrive/Desktop/projects/agent-devkit/DEPS
 - **src/verifier/lean_runner.rs** (262 lines)
 - **src/verifier/mod.rs** (18 lines)
 - **src/verifier/parser.rs** (287 lines)
-- **src/verifier/trace.rs** (851 lines)
+- **src/verifier/trace.rs** (852 lines)
 - **src/visualizer/mod.rs** (4 lines)
 - **src/visualizer/server.rs** (2198 lines)
 

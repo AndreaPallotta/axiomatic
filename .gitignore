@@ -13,3 +13,4 @@ node_modules/
 **/*.ilean
 .devkit/stash/
 showcase/
+dist/
