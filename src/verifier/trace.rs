@@ -433,9 +433,9 @@ fn generate_html_showcase(json_data: &str, trace: &StaticProofTrace) -> String {
         </div>
         <nav class="demo-nav">
             <span class="demo-label">Showcases:</span>
-            <a id="demoLinkMain" href="./" class="demo-chip">Multi-Var Reduction (1,937 Nodes)</a>
-            <a id="demoLinkCompound" href="./compound/" class="demo-chip">Compound Algebra</a>
-            <a id="demoLinkCalc" href="./calculus/" class="demo-chip">Symbolic Calculus</a>
+            <a id="demoLinkMain" href="./" class="demo-chip">Coupled Harmonic ODE (1,301 Nodes)</a>
+            <a id="demoLinkCalc" href="./calculus/" class="demo-chip">Harmonic Oscillator (500 Nodes)</a>
+            <a id="demoLinkMulti" href="./algebra/" class="demo-chip">Multi-Variable Ring (1,937 Nodes)</a>
             <a id="demoLinkBool" href="./bool/" class="demo-chip">Boolean Logic</a>
         </nav>
         <div class="badges">
@@ -895,21 +895,21 @@ fn generate_html_showcase(json_data: &str, trace: &StaticProofTrace) -> String {
         }}
 
         const currentPath = window.location.pathname;
-        const isSubdir = currentPath.includes('/compound') || currentPath.includes('/bool') || currentPath.includes('/calculus');
+        const isSubdir = currentPath.includes('/calculus') || currentPath.includes('/bool') || currentPath.includes('/algebra') || currentPath.includes('/compound');
         const rootPrefix = isSubdir ? '../' : './';
         const linkMain = document.getElementById('demoLinkMain');
-        const linkCompound = document.getElementById('demoLinkCompound');
         const linkCalc = document.getElementById('demoLinkCalc');
+        const linkMulti = document.getElementById('demoLinkMulti');
         const linkBool = document.getElementById('demoLinkBool');
-        if (linkMain && linkCompound && linkCalc && linkBool) {{
+        if (linkMain && linkCalc && linkMulti && linkBool) {{
             linkMain.href = rootPrefix;
-            linkCompound.href = rootPrefix + 'compound/';
             linkCalc.href = rootPrefix + 'calculus/';
+            linkMulti.href = rootPrefix + 'algebra/';
             linkBool.href = rootPrefix + 'bool/';
-            if (currentPath.includes('/compound')) {{
-                linkCompound.classList.add('active');
-            }} else if (currentPath.includes('/calculus')) {{
+            if (currentPath.includes('/calculus')) {{
                 linkCalc.classList.add('active');
+            }} else if (currentPath.includes('/algebra') || currentPath.includes('/compound')) {{
+                linkMulti.classList.add('active');
             }} else if (currentPath.includes('/bool')) {{
                 linkBool.classList.add('active');
             }} else {{

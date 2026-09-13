@@ -39,9 +39,9 @@ jobs:
 
       - name: Generate Showcase Demos
         run: |
-          cargo run --release -- export-trace "(((x + 0) * 1) + ((y * 1) + (z * 0))) = ((0 + y) + (x * 1))" --out dist --html --name "multivar_nested_reduction" --domain algebra --iterations 150
-          cargo run --release -- export-trace "((x + 0) + (y * 1)) = ((1 * y) + (0 + x))" --out dist/compound --html --name "compound_algebra" --domain algebra --iterations 50
-          cargo run --release -- export-trace "(D((x * x)) + -(x + x)) = 0" --out dist/calculus --html --name "calculus_product_rule" --domain calculus --iterations 80
+          cargo run --release -- export-trace "((D(D(sin(x))) + sin(x)) + (D(cos(x)) + sin(x))) = 0" --out dist --html --name "coupled_harmonic_ode" --domain calculus --iterations 250
+          cargo run --release -- export-trace "(D(D(sin(x))) + sin(x)) = 0" --out dist/calculus --html --name "harmonic_oscillator_ode" --domain calculus --iterations 400
+          cargo run --release -- export-trace "(((x + 0) * 1) + ((y * 1) + (z * 0))) = ((0 + y) + (x * 1))" --out dist/algebra --html --name "multivar_nested_reduction" --domain algebra --iterations 150
           cargo run --release -- export-trace "((a & 1) & (b | 0)) = ((0 | b) & (1 & a))" --out dist/bool --html --name "boolean_compound_symmetry" --domain boolean --iterations 50
           echo "axiomatic.andreapallotta.dev" > dist/CNAME
 
