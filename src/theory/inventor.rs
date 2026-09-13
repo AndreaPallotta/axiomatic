@@ -34,7 +34,11 @@ impl TheoryInventor {
             MathDomain::GroupTheory => Self::invent_group_theory(seed),
             MathDomain::IntegralTransforms => Self::invent_integral_transforms(seed),
             MathDomain::CategoryTheory => Self::invent_category_theory(seed),
-            MathDomain::Unified => match seed % 13 {
+            MathDomain::Topology => Self::invent_topology(seed),
+            MathDomain::ExteriorCalculus => Self::invent_exterior_calculus(seed),
+            MathDomain::Combinatorics => Self::invent_combinatorics(seed),
+            MathDomain::ControlTheory => Self::invent_control_theory(seed),
+            MathDomain::Unified => match seed % 17 {
                 0 => Self::invent_algebraic(seed),
                 1 => Self::invent_boolean(seed),
                 2 => Self::invent_calculus(seed),
@@ -47,8 +51,100 @@ impl TheoryInventor {
                 9 => Self::invent_information_theory(seed),
                 10 => Self::invent_group_theory(seed),
                 11 => Self::invent_integral_transforms(seed),
-                _ => Self::invent_category_theory(seed),
+                12 => Self::invent_category_theory(seed),
+                13 => Self::invent_topology(seed),
+                14 => Self::invent_exterior_calculus(seed),
+                15 => Self::invent_combinatorics(seed),
+                _ => Self::invent_control_theory(seed),
             },
+        }
+    }
+
+    fn invent_topology(seed: usize) -> Equality {
+        let a = Term::constant("A");
+        let b = Term::constant("B");
+        match seed % 3 {
+            0 => Equality::new(
+                Term::func("cl", vec![Term::func("cl", vec![a.clone()])]),
+                Term::func("cl", vec![a]),
+            ),
+            1 => Equality::new(
+                Term::func("cl", vec![Term::func("union", vec![a.clone(), b.clone()])]),
+                Term::func("union", vec![Term::func("cl", vec![a]), Term::func("cl", vec![b])]),
+            ),
+            _ => Equality::new(
+                Term::func("int", vec![Term::func("int", vec![a.clone()])]),
+                Term::func("int", vec![a]),
+            ),
+        }
+    }
+
+    fn invent_exterior_calculus(seed: usize) -> Equality {
+        let w = Term::constant("w");
+        let a = Term::constant("a");
+        let b = Term::constant("b");
+        match seed % 3 {
+            0 => Equality::new(
+                Term::func("d_ext", vec![Term::func("d_ext", vec![w])]),
+                Term::constant("0"),
+            ),
+            1 => Equality::new(
+                Term::func("wedge", vec![a.clone(), a]),
+                Term::constant("0"),
+            ),
+            _ => Equality::new(
+                Term::func("d_ext", vec![Term::func("+", vec![a.clone(), b.clone()])]),
+                Term::func("+", vec![Term::func("d_ext", vec![a]), Term::func("d_ext", vec![b])]),
+            ),
+        }
+    }
+
+    fn invent_combinatorics(seed: usize) -> Equality {
+        let n = Term::constant("n");
+        let k = Term::constant("k");
+        let one = Term::constant("1");
+        match seed % 3 {
+            0 => Equality::new(
+                Term::func("binom", vec![n.clone(), k.clone()]),
+                Term::func(
+                    "+",
+                    vec![
+                        Term::func("binom", vec![Term::func("-", vec![n.clone(), one.clone()]), Term::func("-", vec![k.clone(), one.clone()])]),
+                        Term::func("binom", vec![Term::func("-", vec![n, one]), k]),
+                    ],
+                ),
+            ),
+            1 => Equality::new(
+                Term::func("binom", vec![n.clone(), Term::constant("0")]),
+                Term::constant("1"),
+            ),
+            _ => Equality::new(
+                Term::func("binom", vec![n.clone(), n]),
+                Term::constant("1"),
+            ),
+        }
+    }
+
+    fn invent_control_theory(seed: usize) -> Equality {
+        let a = Term::constant("A");
+        let p = Term::constant("P");
+        let q = Term::constant("Q");
+        let lambda = Term::constant("lambda");
+        match seed % 2 {
+            0 => Equality::new(
+                Term::func(
+                    "+",
+                    vec![
+                        Term::func("*", vec![Term::func("T", vec![a.clone()]), p.clone()]),
+                        Term::func("*", vec![p, a]),
+                    ],
+                ),
+                Term::func("-", vec![q]),
+            ),
+            _ => Equality::new(
+                Term::func("det", vec![Term::func("-", vec![lambda, a])]),
+                Term::constant("0"),
+            ),
         }
     }
 

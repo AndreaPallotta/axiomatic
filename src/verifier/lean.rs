@@ -272,6 +272,39 @@ fn map_rule_to_lean_base(rule: &str) -> String {
         "naturality_square" => "naturality_square".to_string(),
         "monad_unit_right" => "monad_unit_right".to_string(),
 
+        "cl_empty" => "cl_empty".to_string(),
+        "cl_univ" => "cl_univ".to_string(),
+        "cl_idempotent" => "cl_idempotent".to_string(),
+        "cl_union" => "cl_union".to_string(),
+        "cl_extensive" => "cl_extensive".to_string(),
+        "int_def" => "int_def".to_string(),
+        "int_idempotent" => "int_idempotent".to_string(),
+        "int_inter" => "int_inter".to_string(),
+        "boundary_def" => "boundary_def".to_string(),
+        "boundary_closed" => "boundary_closed".to_string(),
+
+        "wedge_anticomm" => "wedge_anticomm".to_string(),
+        "wedge_nilpotent" => "wedge_nilpotent".to_string(),
+        "wedge_assoc" => "wedge_assoc".to_string(),
+        "wedge_distrib_left" => "wedge_distrib_left".to_string(),
+        "wedge_zero" => "wedge_zero".to_string(),
+        "d_ext_nilpotent" => "d_ext_nilpotent".to_string(),
+        "d_ext_linear" => "d_ext_linear".to_string(),
+        "d_ext_wedge_1form" => "d_ext_wedge_1form".to_string(),
+
+        "pascal_identity" => "pascal_identity".to_string(),
+        "pascal_identity_rev" => "pascal_identity_rev".to_string(),
+        "binom_zero" => "binom_zero".to_string(),
+        "binom_self" => "binom_self".to_string(),
+        "binom_symm" => "binom_symm".to_string(),
+        "ogf_conv" => "ogf_conv".to_string(),
+        "ogf_linear" => "ogf_linear".to_string(),
+
+        "lyapunov_eq" => "lyapunov_eq".to_string(),
+        "transfer_fn_def" => "transfer_fn_def".to_string(),
+        "state_deriv" => "state_deriv".to_string(),
+        "cayley_hamilton" => "cayley_hamilton".to_string(),
+
         "and_true" => "Bool.and_true".to_string(),
         "true_and" => "Bool.true_and".to_string(),
         "or_false" => "Bool.or_false".to_string(),
@@ -454,8 +487,10 @@ pub fn export_equality_to_lean4(
         code.push_str("axiom laplacian_cartesian (f : Int) : laplacian f = Dx (Dx f) + Dy (Dy f)\n\n");
     }
 
-    let has_prob = goal.lhs.contains_symbol("P") || goal.rhs.contains_symbol("P")
-        || goal.lhs.contains_symbol("cond") || goal.rhs.contains_symbol("cond");
+    let has_prob = !goal.lhs.contains_symbol("T") && !goal.rhs.contains_symbol("T")
+        && !final_state.proof_history.iter().any(|(t, _)| matches!(t, Tactic::RewriteLhs(r) | Tactic::RewriteRhs(r) if r.starts_with("lyapunov_")))
+        && (goal.lhs.contains_symbol("cond") || goal.rhs.contains_symbol("cond")
+            || final_state.proof_history.iter().any(|(t, _)| matches!(t, Tactic::RewriteLhs(r) | Tactic::RewriteRhs(r) if r.starts_with("prob_") || r.starts_with("bayes_"))));
     if has_prob {
         vars.retain(|s| s != "P" && s != "cond" && s != "U");
         code.push_str("opaque P : Int -> Int\n");
@@ -470,18 +505,23 @@ pub fn export_equality_to_lean4(
         code.push_str("axiom bayes_isolated (A B : Int) : prob_cond A B = (prob_cond B A * P A) / P B\n\n");
     }
 
-    let is_group_or_cat = goal.lhs.contains_symbol("phi") || goal.rhs.contains_symbol("phi")
+    let is_other_struct = goal.lhs.contains_symbol("phi") || goal.rhs.contains_symbol("phi")
         || goal.lhs.contains_symbol("conj") || goal.rhs.contains_symbol("conj")
         || goal.lhs.contains_symbol("comp") || goal.rhs.contains_symbol("comp")
-        || goal.lhs.contains_symbol("Map") || goal.rhs.contains_symbol("Map");
+        || goal.lhs.contains_symbol("Map") || goal.rhs.contains_symbol("Map")
+        || goal.lhs.contains_symbol("cl") || goal.rhs.contains_symbol("cl")
+        || goal.lhs.contains_symbol("wedge") || goal.rhs.contains_symbol("wedge");
 
-    let has_matrix = !is_group_or_cat && (goal.lhs.contains_symbol("T") || goal.rhs.contains_symbol("T")
+    let has_control = goal.lhs.contains_symbol("transfer_fn") || goal.rhs.contains_symbol("transfer_fn")
+        || final_state.proof_history.iter().any(|(t, _)| matches!(t, Tactic::RewriteLhs(r) | Tactic::RewriteRhs(r) if r.starts_with("lyapunov_") || r.starts_with("transfer_fn_")));
+
+    let has_matrix = (!is_other_struct && (goal.lhs.contains_symbol("T") || goal.rhs.contains_symbol("T")
         || goal.lhs.contains_symbol("tr") || goal.rhs.contains_symbol("tr")
         || goal.lhs.contains_symbol("det") || goal.rhs.contains_symbol("det")
         || goal.lhs.contains_symbol("I") || goal.rhs.contains_symbol("I")
         || final_state.proof_history.iter().any(|(t, _)| {
             matches!(t, Tactic::RewriteLhs(r) | Tactic::RewriteRhs(r) if r.starts_with("transpose_") || r.starts_with("trace_") || r.starts_with("det_") || r.starts_with("mat_"))
-        }));
+        }))) || has_control;
     if has_matrix {
         vars.retain(|s| s != "T" && s != "tr" && s != "det" && s != "inv" && s != "I");
         code.push_str("structure Matrix where (dummy : Nat) deriving Inhabited\n");
@@ -492,9 +532,19 @@ pub fn export_equality_to_lean4(
         code.push_str("opaque inv : Matrix -> Matrix\n");
         code.push_str("opaque mat_add : Matrix -> Matrix -> Matrix\n");
         code.push_str("opaque mat_mul : Matrix -> Matrix -> Matrix\n");
+        code.push_str("opaque mat_sub : Matrix -> Matrix -> Matrix\n");
+        code.push_str("opaque mat_neg : Matrix -> Matrix\n");
         code.push_str("instance : Add Matrix := ⟨mat_add⟩\n");
         code.push_str("instance : Mul Matrix := ⟨mat_mul⟩\n");
+        code.push_str("instance : Sub Matrix := ⟨mat_sub⟩\n");
+        code.push_str("instance : Neg Matrix := ⟨mat_neg⟩\n");
         code.push_str("instance (n : Nat) : OfNat Matrix n := ⟨⟨n⟩⟩\n");
+        if has_control {
+            vars.retain(|s| s != "transfer_fn" && s != "s");
+            code.push_str("opaque transfer_fn : Matrix -> Matrix -> Matrix -> Matrix -> Matrix -> Matrix\n");
+            code.push_str("axiom lyapunov_eq (A P Q : Matrix) : (T A * P) + (P * A) = -Q\n");
+            code.push_str("axiom transfer_fn_def (C A B D_mat s : Matrix) : transfer_fn C A B D_mat s = (C * (inv (s - A) * B)) + D_mat\n");
+        }
         code.push_str("axiom transpose_add (A B : Matrix) : T (A + B) = T A + T B\n");
         code.push_str("axiom transpose_mul (A B : Matrix) : T (A * B) = T B * T A\n");
         code.push_str("axiom transpose_transpose (A : Matrix) : T (T A) = A\n");
@@ -652,6 +702,75 @@ pub fn export_equality_to_lean4(
         code.push_str("axiom inv_fourier_fourier (f : Int) : invF (F f) = f\n\n");
     }
 
+    let has_topology = goal.lhs.contains_symbol("cl") || goal.rhs.contains_symbol("cl")
+        || goal.lhs.contains_symbol("int") || goal.rhs.contains_symbol("int")
+        || goal.lhs.contains_symbol("boundary") || goal.rhs.contains_symbol("boundary")
+        || goal.lhs.contains_symbol("comp_set") || goal.rhs.contains_symbol("comp_set")
+        || goal.lhs.contains_symbol("inter") || goal.rhs.contains_symbol("inter")
+        || goal.lhs.contains_symbol("empty_set") || goal.rhs.contains_symbol("empty_set")
+        || goal.lhs.contains_symbol("univ_set") || goal.rhs.contains_symbol("univ_set");
+    if has_topology {
+        vars.retain(|s| s != "cl" && s != "int" && s != "boundary" && s != "union" && s != "inter" && s != "comp_set" && s != "empty_set" && s != "univ_set");
+        code.push_str("structure SetElem where (dummy : Nat) deriving Inhabited\n");
+        code.push_str("opaque cl : SetElem -> SetElem\n");
+        code.push_str("opaque int : SetElem -> SetElem\n");
+        code.push_str("opaque boundary : SetElem -> SetElem\n");
+        code.push_str("opaque union : SetElem -> SetElem -> SetElem\n");
+        code.push_str("opaque inter : SetElem -> SetElem -> SetElem\n");
+        code.push_str("opaque comp_set : SetElem -> SetElem\n");
+        code.push_str("opaque empty_set : SetElem\n");
+        code.push_str("opaque univ_set : SetElem\n");
+        code.push_str("axiom cl_empty : cl empty_set = empty_set\n");
+        code.push_str("axiom cl_univ : cl univ_set = univ_set\n");
+        code.push_str("axiom cl_idempotent (A : SetElem) : cl (cl A) = cl A\n");
+        code.push_str("axiom cl_union (A B : SetElem) : cl (union A B) = union (cl A) (cl B)\n");
+        code.push_str("axiom cl_extensive (A : SetElem) : union A (cl A) = cl A\n");
+        code.push_str("axiom int_def (A : SetElem) : int A = comp_set (cl (comp_set A))\n");
+        code.push_str("axiom int_idempotent (A : SetElem) : int (int A) = int A\n");
+        code.push_str("axiom int_inter (A B : SetElem) : int (inter A B) = inter (int A) (int B)\n");
+        code.push_str("axiom boundary_def (A : SetElem) : boundary A = inter (cl A) (cl (comp_set A))\n");
+        code.push_str("axiom boundary_closed (A : SetElem) : cl (boundary A) = boundary A\n\n");
+    }
+
+    let has_exterior = goal.lhs.contains_symbol("wedge") || goal.rhs.contains_symbol("wedge")
+        || goal.lhs.contains_symbol("d_ext") || goal.rhs.contains_symbol("d_ext");
+    if has_exterior {
+        vars.retain(|s| s != "wedge" && s != "d_ext");
+        code.push_str("structure DiffForm where (dummy : Nat) deriving Inhabited\n");
+        code.push_str("opaque form_add : DiffForm -> DiffForm -> DiffForm\n");
+        code.push_str("instance : Add DiffForm := ⟨form_add⟩\n");
+        code.push_str("opaque form_neg : DiffForm -> DiffForm\n");
+        code.push_str("instance : Neg DiffForm := ⟨form_neg⟩\n");
+        code.push_str("opaque form_zero : DiffForm\n");
+        code.push_str("instance : OfNat DiffForm 0 := ⟨form_zero⟩\n");
+        code.push_str("opaque wedge : DiffForm -> DiffForm -> DiffForm\n");
+        code.push_str("opaque d_ext : DiffForm -> DiffForm\n");
+        code.push_str("axiom wedge_anticomm (a b : DiffForm) : wedge a b = - (wedge b a)\n");
+        code.push_str("axiom wedge_nilpotent (a : DiffForm) : wedge a a = 0\n");
+        code.push_str("axiom wedge_assoc (a b c : DiffForm) : wedge (wedge a b) c = wedge a (wedge b c)\n");
+        code.push_str("axiom wedge_distrib_left (a b c : DiffForm) : wedge a (b + c) = wedge a b + wedge a c\n");
+        code.push_str("axiom wedge_zero (a : DiffForm) : wedge a 0 = 0\n");
+        code.push_str("axiom d_ext_nilpotent (w : DiffForm) : d_ext (d_ext w) = 0\n");
+        code.push_str("axiom d_ext_linear (a b : DiffForm) : d_ext (a + b) = d_ext a + d_ext b\n");
+        code.push_str("axiom d_ext_wedge_1form (a b : DiffForm) : d_ext (wedge a b) = wedge (d_ext a) b + - (wedge a (d_ext b))\n\n");
+    }
+
+    let has_combinatorics = goal.lhs.contains_symbol("binom") || goal.rhs.contains_symbol("binom")
+        || goal.lhs.contains_symbol("OGF") || goal.rhs.contains_symbol("OGF");
+    if has_combinatorics {
+        vars.retain(|s| s != "binom" && s != "OGF" && s != "conv_seq");
+        code.push_str("opaque binom : Int -> Int -> Int\n");
+        code.push_str("opaque OGF : Int -> Int -> Int\n");
+        code.push_str("opaque conv_seq : Int -> Int -> Int\n");
+        code.push_str("axiom pascal_identity (n k : Int) : binom n k = binom (n - 1) (k - 1) + binom (n - 1) k\n");
+        code.push_str("axiom pascal_identity_rev (n k : Int) : binom (n - 1) (k - 1) + binom (n - 1) k = binom n k\n");
+        code.push_str("axiom binom_zero (n : Int) : binom n 0 = 1\n");
+        code.push_str("axiom binom_self (n : Int) : binom n n = 1\n");
+        code.push_str("axiom binom_symm (n k : Int) : binom n k = binom n (n - k)\n");
+        code.push_str("axiom ogf_conv (f g x : Int) : OGF (conv_seq f g) x = OGF f x * OGF g x\n");
+        code.push_str("axiom ogf_linear (f g x : Int) : OGF (f + g) x = OGF f x + OGF g x\n\n");
+    }
+
     fn has_negation(term: &Term) -> bool {
         match term {
             Term::Const(s) => s.starts_with('-'),
@@ -665,11 +784,15 @@ pub fn export_equality_to_lean4(
         "GroupElem"
     } else if has_category {
         "Morphism"
+    } else if has_topology {
+        "SetElem"
+    } else if has_exterior {
+        "DiffForm"
     } else if has_matrix {
         "Matrix"
     } else if has_imaginary {
         "ComplexI"
-    } else if has_calculus || has_multivar || has_prob || has_info || has_transforms || has_factoring || has_order || has_negation(&goal.lhs) || has_negation(&goal.rhs) {
+    } else if has_calculus || has_multivar || has_prob || has_info || has_transforms || has_combinatorics || has_factoring || has_order || has_negation(&goal.lhs) || has_negation(&goal.rhs) {
         "Int"
     } else {
         "Nat"

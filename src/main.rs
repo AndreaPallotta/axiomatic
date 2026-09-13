@@ -305,6 +305,23 @@ fn run_autonomous_proof_cli(custom_conjecture: Option<&str>, induction_var: Opti
     let is_prob = target_eq.lhs.contains_symbol("P") || target_eq.rhs.contains_symbol("P")
         || target_eq.lhs.contains_symbol("cond") || target_eq.rhs.contains_symbol("cond");
 
+    let is_topology = target_eq.lhs.contains_symbol("cl") || target_eq.rhs.contains_symbol("cl")
+        || target_eq.lhs.contains_symbol("int") || target_eq.rhs.contains_symbol("int")
+        || target_eq.lhs.contains_symbol("boundary") || target_eq.rhs.contains_symbol("boundary")
+        || target_eq.lhs.contains_symbol("comp_set") || target_eq.rhs.contains_symbol("comp_set")
+        || target_eq.lhs.contains_symbol("empty_set") || target_eq.rhs.contains_symbol("empty_set")
+        || target_eq.lhs.contains_symbol("univ_set") || target_eq.rhs.contains_symbol("univ_set");
+
+    let is_exterior = target_eq.lhs.contains_symbol("wedge") || target_eq.rhs.contains_symbol("wedge")
+        || target_eq.lhs.contains_symbol("d_ext") || target_eq.rhs.contains_symbol("d_ext");
+
+    let is_combinatorics = target_eq.lhs.contains_symbol("binom") || target_eq.rhs.contains_symbol("binom")
+        || target_eq.lhs.contains_symbol("OGF") || target_eq.rhs.contains_symbol("OGF")
+        || target_eq.lhs.contains_symbol("conv_seq") || target_eq.rhs.contains_symbol("conv_seq");
+
+    let is_control = target_eq.lhs.contains_symbol("transfer_fn") || target_eq.rhs.contains_symbol("transfer_fn")
+        || (target_eq.lhs.contains_symbol("T") && target_eq.rhs.contains_symbol("Q"));
+
     println!("[TARGET] Conjecture: {}\n", target_eq);
 
     // Active Counterexample Falsification Check
@@ -322,7 +339,19 @@ fn run_autonomous_proof_cli(custom_conjecture: Option<&str>, induction_var: Opti
         return;
     }
 
-    let axioms = if is_group {
+    let axioms = if is_topology {
+        println!("[DOMAIN] Detected General Topology & Kuratowski Closure Domain");
+        AxiomLibrary::topology()
+    } else if is_exterior {
+        println!("[DOMAIN] Detected Exterior Calculus & Differential Forms Domain");
+        AxiomLibrary::exterior_calculus()
+    } else if is_combinatorics {
+        println!("[DOMAIN] Detected Combinatorics & Generating Functions Domain");
+        AxiomLibrary::combinatorics()
+    } else if is_control {
+        println!("[DOMAIN] Detected Control Theory & Dynamical Systems Domain");
+        AxiomLibrary::control_theory()
+    } else if is_group {
         println!("[DOMAIN] Detected Abstract Group Theory Domain");
         AxiomLibrary::group_theory()
     } else if is_matrix {
@@ -413,7 +442,7 @@ fn run_autonomous_proof_cli(custom_conjecture: Option<&str>, induction_var: Opti
     }
 
     let (model, epochs, _) = axiomatic::ModelCheckpoint::try_load_or_init("models");
-    let policy: Box<dyn axiomatic::NeuralPolicy> = if is_bool || is_matrix || is_group || is_category || is_transforms || is_info || is_order || is_calculus || is_multivar || is_prob {
+    let policy: Box<dyn axiomatic::NeuralPolicy> = if is_bool || is_matrix || is_group || is_category || is_transforms || is_info || is_order || is_calculus || is_multivar || is_prob || is_topology || is_exterior || is_combinatorics || is_control {
         Box::new(SymbolicNeuralPolicy::new())
     } else {
         if epochs > 0 {
@@ -428,7 +457,7 @@ fn run_autonomous_proof_cli(custom_conjecture: Option<&str>, induction_var: Opti
     };
 
     let initial_state = ProofState::new(target_eq.clone());
-    let max_children = if is_calculus || is_multivar || is_prob || is_info || is_group || is_transforms || is_category { 12 } else { 8 };
+    let max_children = if is_calculus || is_multivar || is_prob || is_info || is_group || is_transforms || is_category || is_topology || is_exterior || is_combinatorics || is_control { 12 } else { 8 };
     let mut mcts = MctsEngine::new(initial_state, max_children);
 
     let start = std::time::Instant::now();

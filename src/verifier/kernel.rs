@@ -110,6 +110,10 @@ pub enum MathDomain {
     GroupTheory,
     IntegralTransforms,
     CategoryTheory,
+    Topology,
+    ExteriorCalculus,
+    Combinatorics,
+    ControlTheory,
     Unified,
 }
 
@@ -129,6 +133,10 @@ impl MathDomain {
             MathDomain::GroupTheory => "Abstract Group Theory",
             MathDomain::IntegralTransforms => "Integral Transforms",
             MathDomain::CategoryTheory => "Category Theory",
+            MathDomain::Topology => "General Topology",
+            MathDomain::ExteriorCalculus => "Exterior Calculus & Differential Forms",
+            MathDomain::Combinatorics => "Combinatorics & Generating Functions",
+            MathDomain::ControlTheory => "Control Theory & Dynamical Systems",
             MathDomain::Unified => "Unified Multidomain",
         }
     }
@@ -160,6 +168,10 @@ impl AxiomLibrary {
             MathDomain::GroupTheory => Self::group_theory(),
             MathDomain::IntegralTransforms => Self::integral_transforms(),
             MathDomain::CategoryTheory => Self::category_theory(),
+            MathDomain::Topology => Self::topology(),
+            MathDomain::ExteriorCalculus => Self::exterior_calculus(),
+            MathDomain::Combinatorics => Self::combinatorics(),
+            MathDomain::ControlTheory => Self::control_theory(),
             MathDomain::Unified => Self::unified_multidomain(),
         }
     }
@@ -1970,6 +1982,397 @@ impl AxiomLibrary {
         lib
     }
 
+    /// General Topology & Kuratowski Closure Spaces
+    pub fn topology() -> Self {
+        let mut lib = Self::empty();
+        let a = Term::var("A");
+        let b = Term::var("B");
+        let empty_set = Term::constant("empty_set");
+        let univ_set = Term::constant("univ_set");
+
+        lib.add_rule(
+            "cl_empty",
+            Equality::new(
+                Term::func("cl", vec![empty_set.clone()]),
+                empty_set.clone(),
+            ),
+        );
+        lib.add_rule(
+            "cl_univ",
+            Equality::new(
+                Term::func("cl", vec![univ_set.clone()]),
+                univ_set.clone(),
+            ),
+        );
+        lib.add_rule(
+            "cl_idempotent",
+            Equality::new(
+                Term::func("cl", vec![Term::func("cl", vec![a.clone()])]),
+                Term::func("cl", vec![a.clone()]),
+            ),
+        );
+        lib.add_rule(
+            "cl_union",
+            Equality::new(
+                Term::func("cl", vec![Term::func("union", vec![a.clone(), b.clone()])]),
+                Term::func("union", vec![
+                    Term::func("cl", vec![a.clone()]),
+                    Term::func("cl", vec![b.clone()]),
+                ]),
+            ),
+        );
+        lib.add_rule(
+            "cl_extensive",
+            Equality::new(
+                Term::func("union", vec![a.clone(), Term::func("cl", vec![a.clone()])]),
+                Term::func("cl", vec![a.clone()]),
+            ),
+        );
+        lib.add_rule(
+            "int_def",
+            Equality::new(
+                Term::func("int", vec![a.clone()]),
+                Term::func("comp_set", vec![Term::func("cl", vec![Term::func("comp_set", vec![a.clone()])])]),
+            ),
+        );
+        lib.add_rule(
+            "int_idempotent",
+            Equality::new(
+                Term::func("int", vec![Term::func("int", vec![a.clone()])]),
+                Term::func("int", vec![a.clone()]),
+            ),
+        );
+        lib.add_rule(
+            "int_inter",
+            Equality::new(
+                Term::func("int", vec![Term::func("inter", vec![a.clone(), b.clone()])]),
+                Term::func("inter", vec![
+                    Term::func("int", vec![a.clone()]),
+                    Term::func("int", vec![b.clone()]),
+                ]),
+            ),
+        );
+        lib.add_rule(
+            "boundary_def",
+            Equality::new(
+                Term::func("boundary", vec![a.clone()]),
+                Term::func("inter", vec![
+                    Term::func("cl", vec![a.clone()]),
+                    Term::func("cl", vec![Term::func("comp_set", vec![a.clone()])]),
+                ]),
+            ),
+        );
+        lib.add_rule(
+            "boundary_closed",
+            Equality::new(
+                Term::func("cl", vec![Term::func("boundary", vec![a.clone()])]),
+                Term::func("boundary", vec![a.clone()]),
+            ),
+        );
+
+        lib
+    }
+
+    /// Exterior Calculus & Differential Forms
+    pub fn exterior_calculus() -> Self {
+        let mut lib = Self::empty();
+        let a = Term::var("a");
+        let b = Term::var("b");
+        let c = Term::var("c");
+        let w = Term::var("w");
+        let zero = Term::constant("0");
+
+        lib.add_rule(
+            "wedge_anticomm",
+            Equality::new(
+                Term::func("wedge", vec![a.clone(), b.clone()]),
+                Term::func("-", vec![Term::func("wedge", vec![b.clone(), a.clone()])]),
+            ),
+        );
+        lib.add_rule(
+            "wedge_nilpotent",
+            Equality::new(
+                Term::func("wedge", vec![a.clone(), a.clone()]),
+                zero.clone(),
+            ),
+        );
+        lib.add_rule(
+            "wedge_assoc",
+            Equality::new(
+                Term::func(
+                    "wedge",
+                    vec![
+                        Term::func("wedge", vec![a.clone(), b.clone()]),
+                        c.clone(),
+                    ],
+                ),
+                Term::func(
+                    "wedge",
+                    vec![
+                        a.clone(),
+                        Term::func("wedge", vec![b.clone(), c.clone()]),
+                    ],
+                ),
+            ),
+        );
+        lib.add_rule(
+            "wedge_distrib_left",
+            Equality::new(
+                Term::func(
+                    "wedge",
+                    vec![
+                        a.clone(),
+                        Term::func("+", vec![b.clone(), c.clone()]),
+                    ],
+                ),
+                Term::func(
+                    "+",
+                    vec![
+                        Term::func("wedge", vec![a.clone(), b.clone()]),
+                        Term::func("wedge", vec![a.clone(), c.clone()]),
+                    ],
+                ),
+            ),
+        );
+        lib.add_rule(
+            "wedge_zero",
+            Equality::new(
+                Term::func("wedge", vec![a.clone(), zero.clone()]),
+                zero.clone(),
+            ),
+        );
+        lib.add_rule(
+            "d_ext_nilpotent",
+            Equality::new(
+                Term::func("d_ext", vec![Term::func("d_ext", vec![w.clone()])]),
+                zero.clone(),
+            ),
+        );
+        lib.add_rule(
+            "d_ext_linear",
+            Equality::new(
+                Term::func("d_ext", vec![Term::func("+", vec![a.clone(), b.clone()])]),
+                Term::func(
+                    "+",
+                    vec![
+                        Term::func("d_ext", vec![a.clone()]),
+                        Term::func("d_ext", vec![b.clone()]),
+                    ],
+                ),
+            ),
+        );
+        lib.add_rule(
+            "d_ext_wedge_1form",
+            Equality::new(
+                Term::func("d_ext", vec![Term::func("wedge", vec![a.clone(), b.clone()])]),
+                Term::func(
+                    "+",
+                    vec![
+                        Term::func("wedge", vec![Term::func("d_ext", vec![a.clone()]), b.clone()]),
+                        Term::func("-", vec![Term::func("wedge", vec![a.clone(), Term::func("d_ext", vec![b.clone()])])]),
+                    ],
+                ),
+            ),
+        );
+
+        lib
+    }
+
+    /// Combinatorics & Generating Functions
+    pub fn combinatorics() -> Self {
+        let mut lib = Self::empty();
+        let n = Term::var("n");
+        let k = Term::var("k");
+        let x = Term::var("x");
+        let f = Term::var("f");
+        let g = Term::var("g");
+        let zero = Term::constant("0");
+        let one = Term::constant("1");
+
+        lib.add_rule(
+            "pascal_identity",
+            Equality::new(
+                Term::func("binom", vec![n.clone(), k.clone()]),
+                Term::func(
+                    "+",
+                    vec![
+                        Term::func(
+                            "binom",
+                            vec![
+                                Term::func("+", vec![n.clone(), Term::func("-", vec![one.clone()])]),
+                                Term::func("+", vec![k.clone(), Term::func("-", vec![one.clone()])]),
+                            ],
+                        ),
+                        Term::func(
+                            "binom",
+                            vec![
+                                Term::func("+", vec![n.clone(), Term::func("-", vec![one.clone()])]),
+                                k.clone(),
+                            ],
+                        ),
+                    ],
+                ),
+            ),
+        );
+        lib.add_rule(
+            "pascal_identity_rev",
+            Equality::new(
+                Term::func(
+                    "+",
+                    vec![
+                        Term::func(
+                            "binom",
+                            vec![
+                                Term::func("+", vec![n.clone(), Term::func("-", vec![one.clone()])]),
+                                Term::func("+", vec![k.clone(), Term::func("-", vec![one.clone()])]),
+                            ],
+                        ),
+                        Term::func(
+                            "binom",
+                            vec![
+                                Term::func("+", vec![n.clone(), Term::func("-", vec![one.clone()])]),
+                                k.clone(),
+                            ],
+                        ),
+                    ],
+                ),
+                Term::func("binom", vec![n.clone(), k.clone()]),
+            ),
+        );
+        lib.add_rule(
+            "binom_zero",
+            Equality::new(
+                Term::func("binom", vec![n.clone(), zero.clone()]),
+                one.clone(),
+            ),
+        );
+        lib.add_rule(
+            "binom_self",
+            Equality::new(
+                Term::func("binom", vec![n.clone(), n.clone()]),
+                one.clone(),
+            ),
+        );
+        lib.add_rule(
+            "binom_symm",
+            Equality::new(
+                Term::func("binom", vec![n.clone(), k.clone()]),
+                Term::func(
+                    "binom",
+                    vec![
+                        n.clone(),
+                        Term::func("+", vec![n.clone(), Term::func("-", vec![k.clone()])]),
+                    ],
+                ),
+            ),
+        );
+        lib.add_rule(
+            "ogf_conv",
+            Equality::new(
+                Term::func("OGF", vec![Term::func("conv_seq", vec![f.clone(), g.clone()]), x.clone()]),
+                Term::func(
+                    "*",
+                    vec![
+                        Term::func("OGF", vec![f.clone(), x.clone()]),
+                        Term::func("OGF", vec![g.clone(), x.clone()]),
+                    ],
+                ),
+            ),
+        );
+        lib.add_rule(
+            "ogf_linear",
+            Equality::new(
+                Term::func("OGF", vec![Term::func("+", vec![f.clone(), g.clone()]), x.clone()]),
+                Term::func(
+                    "+",
+                    vec![
+                        Term::func("OGF", vec![f.clone(), x.clone()]),
+                        Term::func("OGF", vec![g.clone(), x.clone()]),
+                    ],
+                ),
+            ),
+        );
+
+        lib
+    }
+
+    /// Control Theory & Dynamical Systems
+    pub fn control_theory() -> Self {
+        let mut lib = Self::empty();
+        let a = Term::var("A");
+        let b = Term::var("B");
+        let c = Term::var("C");
+        let d_mat = Term::var("D_mat");
+        let p = Term::var("P");
+        let q = Term::constant("Q");
+        let s = Term::var("s");
+        let x = Term::var("x");
+        let u = Term::var("u");
+        let lambda = Term::var("lambda");
+        let zero = Term::constant("0");
+
+        lib.add_rule(
+            "lyapunov_eq",
+            Equality::new(
+                Term::func(
+                    "+",
+                    vec![
+                        Term::func("*", vec![Term::func("T", vec![a.clone()]), p.clone()]),
+                        Term::func("*", vec![p.clone(), a.clone()]),
+                    ],
+                ),
+                Term::func("-", vec![q.clone()]),
+            ),
+        );
+        lib.add_rule(
+            "transfer_fn_def",
+            Equality::new(
+                Term::func("transfer_fn", vec![c.clone(), a.clone(), b.clone(), d_mat.clone(), s.clone()]),
+                Term::func(
+                    "+",
+                    vec![
+                        Term::func(
+                            "*",
+                            vec![
+                                c.clone(),
+                                Term::func(
+                                    "*",
+                                    vec![
+                                        Term::func("inv", vec![Term::func("-", vec![s.clone(), a.clone()])]),
+                                        b.clone(),
+                                    ],
+                                ),
+                            ],
+                        ),
+                        d_mat.clone(),
+                    ],
+                ),
+            ),
+        );
+        lib.add_rule(
+            "state_deriv",
+            Equality::new(
+                Term::func("D", vec![x.clone()]),
+                Term::func(
+                    "+",
+                    vec![
+                        Term::func("*", vec![a.clone(), x.clone()]),
+                        Term::func("*", vec![b.clone(), u.clone()]),
+                    ],
+                ),
+            ),
+        );
+        lib.add_rule(
+            "cayley_hamilton",
+            Equality::new(
+                Term::func("det", vec![Term::func("-", vec![lambda.clone(), a.clone()])]),
+                zero.clone(),
+            ),
+        );
+
+        lib
+    }
+
     /// Unified Multi-Domain Library
     pub fn unified_multidomain() -> Self {
         let mut lib = Self::standard_algebra();
@@ -2029,6 +2432,26 @@ impl AxiomLibrary {
             }
         }
         for (name, rule) in Self::category_theory().rules {
+            if !lib.rules.iter().any(|(n, _)| n == &name) {
+                lib.add_rule(&name, rule);
+            }
+        }
+        for (name, rule) in Self::topology().rules {
+            if !lib.rules.iter().any(|(n, _)| n == &name) {
+                lib.add_rule(&name, rule);
+            }
+        }
+        for (name, rule) in Self::exterior_calculus().rules {
+            if !lib.rules.iter().any(|(n, _)| n == &name) {
+                lib.add_rule(&name, rule);
+            }
+        }
+        for (name, rule) in Self::combinatorics().rules {
+            if !lib.rules.iter().any(|(n, _)| n == &name) {
+                lib.add_rule(&name, rule);
+            }
+        }
+        for (name, rule) in Self::control_theory().rules {
             if !lib.rules.iter().any(|(n, _)| n == &name) {
                 lib.add_rule(&name, rule);
             }

@@ -139,9 +139,15 @@ impl MctsEngine {
             return 0.0;
         }
 
-        // Build child nodes
+        // Build child nodes with Active Counterexample Pruning
         let mut child_ids = Vec::new();
         for (tactic, next_state) in valid_transitions {
+            if next_state.open_goals.iter().any(|g| {
+                crate::verifier::eval::find_counterexample(&g.equality).is_some()
+            }) {
+                continue;
+            }
+
             // Find neural prior for this tactic
             let prior = policy_output
                 .prior_probabilities
@@ -172,6 +178,12 @@ impl MctsEngine {
             self.emit(SearchEvent::NodeCreated(child_node.clone()));
             self.nodes.push(child_node);
             child_ids.push(new_node_id);
+        }
+
+        if child_ids.is_empty() {
+            self.nodes[leaf_id].is_terminal = true;
+            self.nodes[leaf_id].is_expanded = true;
+            return -1.0;
         }
 
         self.nodes[leaf_id].children_ids = child_ids;
@@ -822,6 +834,160 @@ mod tests {
             crate::verifier::lean_runner::LeanValidationResult::LeanNotInstalled { .. } => {}
             crate::verifier::lean_runner::LeanValidationResult::CompilerError { stderr, stdout } => {
                 panic!("Lean 4 compilation failed: stderr={}, stdout={}", stderr, stdout);
+            }
+        }
+    }
+
+    #[test]
+    fn test_mcts_proves_kuratowski_closure_idempotent() {
+        let policy = crate::generator::policy::SymbolicNeuralPolicy::new();
+        let axioms = AxiomLibrary::topology();
+        let Ok(eq) = crate::verifier::parser::parse_conjecture("cl(cl(A)) = cl(A)") else {
+            panic!("Failed to parse Kuratowski closure idempotent identity");
+        };
+        let mut mcts = MctsEngine::new(ProofState::new(eq.clone()), 4);
+        let proof = mcts.run_search(&policy, &axioms, 10);
+        let Some(solved) = proof else {
+            panic!("MCTS must prove Kuratowski closure idempotence");
+        };
+        assert!(solved.is_solved);
+
+        let lean_code = crate::verifier::lean::export_equality_to_lean4("kuratowski_closure_theorem", &eq, &solved);
+        let proofs_dir = std::path::Path::new("proofs");
+        let _ = std::fs::create_dir_all(proofs_dir);
+        let artifact_path = proofs_dir.join("test_topology_proof.lean");
+        let write_res = std::fs::write(&artifact_path, &lean_code);
+        assert!(write_res.is_ok(), "Failed to write topology proof");
+
+        let val_result = crate::verifier::lean_runner::Lean4Validator::validate_file(&artifact_path);
+        match val_result {
+            crate::verifier::lean_runner::LeanValidationResult::Certified { .. } => {}
+            crate::verifier::lean_runner::LeanValidationResult::LeanNotInstalled { .. } => {}
+            crate::verifier::lean_runner::LeanValidationResult::CompilerError { stderr, stdout } => {
+                panic!("Lean 4 compilation failed: stderr={}, stdout={}", stderr, stdout);
+            }
+        }
+    }
+
+    #[test]
+    fn test_mcts_proves_exterior_derivative_nilpotence() {
+        let policy = crate::generator::policy::SymbolicNeuralPolicy::new();
+        let axioms = AxiomLibrary::exterior_calculus();
+        let Ok(eq) = crate::verifier::parser::parse_conjecture("d_ext(d_ext(w)) = 0") else {
+            panic!("Failed to parse exterior derivative nilpotence");
+        };
+        let mut mcts = MctsEngine::new(ProofState::new(eq.clone()), 4);
+        let proof = mcts.run_search(&policy, &axioms, 10);
+        let Some(solved) = proof else {
+            panic!("MCTS must prove exterior derivative nilpotence");
+        };
+        assert!(solved.is_solved);
+
+        let lean_code = crate::verifier::lean::export_equality_to_lean4("exterior_nilpotent_theorem", &eq, &solved);
+        let proofs_dir = std::path::Path::new("proofs");
+        let _ = std::fs::create_dir_all(proofs_dir);
+        let artifact_path = proofs_dir.join("test_exterior_proof.lean");
+        let write_res = std::fs::write(&artifact_path, &lean_code);
+        assert!(write_res.is_ok(), "Failed to write exterior proof");
+
+        let val_result = crate::verifier::lean_runner::Lean4Validator::validate_file(&artifact_path);
+        match val_result {
+            crate::verifier::lean_runner::LeanValidationResult::Certified { .. } => {}
+            crate::verifier::lean_runner::LeanValidationResult::LeanNotInstalled { .. } => {}
+            crate::verifier::lean_runner::LeanValidationResult::CompilerError { stderr, stdout } => {
+                panic!("Lean 4 compilation failed: stderr={}, stdout={}", stderr, stdout);
+            }
+        }
+    }
+
+    #[test]
+    fn test_mcts_proves_pascal_combinatorial_identity() {
+        let policy = crate::generator::policy::SymbolicNeuralPolicy::new();
+        let axioms = AxiomLibrary::combinatorics();
+        let Ok(eq) = crate::verifier::parser::parse_conjecture("binom(n, k) = (binom((n - 1), (k - 1)) + binom((n - 1), k))") else {
+            panic!("Failed to parse Pascal combinatorial identity");
+        };
+        let mut mcts = MctsEngine::new(ProofState::new(eq.clone()), 4);
+        let proof = mcts.run_search(&policy, &axioms, 10);
+        let Some(solved) = proof else {
+            panic!("MCTS must prove Pascal identity");
+        };
+        assert!(solved.is_solved);
+
+        let lean_code = crate::verifier::lean::export_equality_to_lean4("pascal_combinatorial_theorem", &eq, &solved);
+        let proofs_dir = std::path::Path::new("proofs");
+        let _ = std::fs::create_dir_all(proofs_dir);
+        let artifact_path = proofs_dir.join("test_combinatorics_proof.lean");
+        let write_res = std::fs::write(&artifact_path, &lean_code);
+        assert!(write_res.is_ok(), "Failed to write combinatorics proof");
+
+        let val_result = crate::verifier::lean_runner::Lean4Validator::validate_file(&artifact_path);
+        match val_result {
+            crate::verifier::lean_runner::LeanValidationResult::Certified { .. } => {}
+            crate::verifier::lean_runner::LeanValidationResult::LeanNotInstalled { .. } => {}
+            crate::verifier::lean_runner::LeanValidationResult::CompilerError { stderr, stdout } => {
+                panic!("Lean 4 compilation failed: stderr={}, stdout={}", stderr, stdout);
+            }
+        }
+    }
+
+    #[test]
+    fn test_mcts_proves_lyapunov_stability_equation() {
+        let policy = crate::generator::policy::SymbolicNeuralPolicy::new();
+        let axioms = AxiomLibrary::control_theory();
+        let Ok(eq) = crate::verifier::parser::parse_conjecture("((T(A) * P) + (P * A)) = -Q") else {
+            panic!("Failed to parse Lyapunov stability equation");
+        };
+        let mut mcts = MctsEngine::new(ProofState::new(eq.clone()), 4);
+        let proof = mcts.run_search(&policy, &axioms, 10);
+        let Some(solved) = proof else {
+            panic!("MCTS must prove Lyapunov equation");
+        };
+        assert!(solved.is_solved);
+
+        let lean_code = crate::verifier::lean::export_equality_to_lean4("lyapunov_stability_theorem", &eq, &solved);
+        let proofs_dir = std::path::Path::new("proofs");
+        let _ = std::fs::create_dir_all(proofs_dir);
+        let artifact_path = proofs_dir.join("test_control_proof.lean");
+        let write_res = std::fs::write(&artifact_path, &lean_code);
+        assert!(write_res.is_ok(), "Failed to write control proof");
+
+        let val_result = crate::verifier::lean_runner::Lean4Validator::validate_file(&artifact_path);
+        match val_result {
+            crate::verifier::lean_runner::LeanValidationResult::Certified { .. } => {}
+            crate::verifier::lean_runner::LeanValidationResult::LeanNotInstalled { .. } => {}
+            crate::verifier::lean_runner::LeanValidationResult::CompilerError { stderr, stdout } => {
+                panic!("Lean 4 compilation failed: stderr={}, stdout={}", stderr, stdout);
+            }
+        }
+    }
+
+    #[test]
+    fn test_active_counterexample_pruning_filters_dead_branches() {
+        let policy = crate::generator::policy::SymbolicNeuralPolicy::new();
+        let mut bad_axioms = AxiomLibrary::empty();
+        let x = Term::var("x");
+        bad_axioms.add_rule(
+            "bad_shift",
+            Equality::new(x.clone(), Term::func("+", vec![x.clone(), Term::constant("1")])),
+        );
+        bad_axioms.add_rule(
+            "valid_id",
+            Equality::new(x.clone(), Term::func("+", vec![x.clone(), Term::constant("0")])),
+        );
+
+        let Ok(eq) = crate::verifier::parser::parse_conjecture("x = x") else {
+            panic!("Failed to parse identity");
+        };
+
+        let state = ProofState::new(eq);
+        let mut mcts = MctsEngine::new(state, 8);
+        mcts.step(&policy, &bad_axioms);
+
+        for child_id in &mcts.nodes[0].children_ids {
+            let child_node = &mcts.nodes[*child_id];
+            for goal in &child_node.state.open_goals {
+                assert!(crate::verifier::eval::find_counterexample(&goal.equality).is_none());
             }
         }
     }
