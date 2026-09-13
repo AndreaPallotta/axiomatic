@@ -554,6 +554,7 @@ async fn post_domain_select_handler(
         "boolean" => MathDomain::BooleanLogic,
         "calculus" => MathDomain::SymbolicCalculus,
         "set_theory" => MathDomain::SetTheory,
+        "complex" => MathDomain::ComplexNumbers,
         "unified" => MathDomain::Unified,
         _ => MathDomain::AbstractAlgebra,
     };
@@ -887,6 +888,7 @@ async fn post_continuous_discovery_start_handler(
                 "boolean" => MathDomain::BooleanLogic,
                 "calculus" => MathDomain::SymbolicCalculus,
                 "set_theory" => MathDomain::SetTheory,
+                "complex" => MathDomain::ComplexNumbers,
                 "unified" => MathDomain::Unified,
                 _ => MathDomain::AbstractAlgebra,
             };
@@ -1401,6 +1403,7 @@ pub const DASHBOARD_HTML: &str = r#"<!DOCTYPE html>
         .domain-boolean { background: #fef7e0; color: #b06000; }
         .domain-calculus { background: #f3e8fd; color: #7627bb; }
         .domain-set_theory { background: #e6f4ea; color: #137333; }
+        .domain-complex { background: #fce8e6; color: #c5221f; }
 
         /* Proof scroll */
         .proof-scroll { overflow-y: auto; max-height: 110px; display: flex; flex-direction: column; gap: 4px; }
@@ -1448,6 +1451,7 @@ pub const DASHBOARD_HTML: &str = r#"<!DOCTYPE html>
                 <option value="boolean">Boolean Propositional Logic</option>
                 <option value="calculus">Symbolic Calculus & Derivatives</option>
                 <option value="set_theory">Set Theory & Relations</option>
+                <option value="complex">Complex Numbers & Polynomials</option>
             </select>
         </div>
 
@@ -1473,7 +1477,7 @@ pub const DASHBOARD_HTML: &str = r#"<!DOCTYPE html>
             <div class="sub-toolbar">
                 <div class="toolbar-group" style="display:flex; align-items:center; gap:6px; flex:1; min-width:340px;">
                     <span style="font-size:0.72rem; font-weight:700; color:var(--md-text-secondary);">GOAL:</span>
-                    <input type="text" id="goal-input" value="((x + -(x)) + (y * 1)) = (0 + y)" style="flex:1; max-width:240px; padding:4px 8px; border-radius:6px; border:1px solid var(--md-border); font-family:'Roboto Mono', monospace; font-size:0.75rem; outline:none;">
+                    <input type="text" id="goal-input" value="((x + -(x)) + (y * 1)) = (0 + y)" oninput="this.dataset.dirty='true'" onkeydown="if(event.key==='Enter') setGoalFromInput()" style="flex:1; max-width:240px; padding:4px 8px; border-radius:6px; border:1px solid var(--md-border); font-family:'Roboto Mono', monospace; font-size:0.75rem; outline:none;">
                     <button class="btn btn-tonal btn-sm" onclick="setGoalFromInput()">Set</button>
                     <button class="btn btn-filled btn-sm" onclick="stepMcts(15)">Step +15</button>
                     <button class="btn btn-tonal btn-sm" onclick="applyInduction()">Induct</button>
@@ -1732,7 +1736,10 @@ pub const DASHBOARD_HTML: &str = r#"<!DOCTYPE html>
             try {
                 const res = await fetch('/api/status');
                 const data = await res.json();
-                document.getElementById('goal-input').value = data.conjecture;
+                const goalInput = document.getElementById('goal-input');
+                if (goalInput && document.activeElement !== goalInput && goalInput.dataset.dirty !== 'true') {
+                    goalInput.value = data.conjecture;
+                }
                 document.getElementById('iter-count').innerText = data.iterations;
                 document.getElementById('stat-discoveries').innerText = data.invented_theorems_count || 0;
                 document.getElementById('stat-premises').innerText = data.vector_premises_count || 0;
@@ -1740,7 +1747,7 @@ pub const DASHBOARD_HTML: &str = r#"<!DOCTYPE html>
 
                 if (data.active_domain) {
                     const sel = document.getElementById('domain-select');
-                    const domKey = data.active_domain.toLowerCase().includes('bool') ? 'boolean' : (data.active_domain.toLowerCase().includes('calc') ? 'calculus' : (data.active_domain.toLowerCase().includes('set') ? 'set_theory' : (data.active_domain.toLowerCase().includes('unified') ? 'unified' : 'algebra')));
+                    const domKey = data.active_domain.toLowerCase().includes('bool') ? 'boolean' : (data.active_domain.toLowerCase().includes('calc') ? 'calculus' : (data.active_domain.toLowerCase().includes('set') ? 'set_theory' : (data.active_domain.toLowerCase().includes('complex') ? 'complex' : (data.active_domain.toLowerCase().includes('unified') ? 'unified' : 'algebra'))));
                     if (sel && sel.value !== domKey) sel.value = domKey;
                 }
 
@@ -1803,7 +1810,7 @@ pub const DASHBOARD_HTML: &str = r#"<!DOCTYPE html>
                     data.theorems.slice(0, 15).forEach(t => {
                         const tr = document.createElement('tr');
                         const dom = t.domain || 'Algebra';
-                        const domClass = dom.toLowerCase().includes('bool') ? 'domain-boolean' : (dom.toLowerCase().includes('calc') ? 'domain-calculus' : (dom.toLowerCase().includes('set') ? 'domain-set_theory' : 'domain-algebra'));
+                        const domClass = dom.toLowerCase().includes('bool') ? 'domain-boolean' : (dom.toLowerCase().includes('calc') ? 'domain-calculus' : (dom.toLowerCase().includes('set') ? 'domain-set_theory' : (dom.toLowerCase().includes('complex') ? 'domain-complex' : 'domain-algebra')));
                         const safeConj = t.conjecture.replace(/"/g, '&quot;').replace(/'/g, "\\'");
 
                         tr.innerHTML = `<td><code>${t.conjecture}</code></td><td><span class="domain-pill ${domClass}">${dom}</span></td><td>${t.proof_steps}</td><td><button class="btn btn-tonal btn-sm" onclick="loadAndProveGoal('${safeConj}')" style="padding:1px 5px; font-size:0.65rem;">Load</button></td>`;
@@ -1845,13 +1852,19 @@ pub const DASHBOARD_HTML: &str = r#"<!DOCTYPE html>
         }
 
         async function setGoalFromInput() {
-            const eq = document.getElementById('goal-input').value.trim();
+            const inp = document.getElementById('goal-input');
+            const eq = inp.value.trim();
             if (!eq) return;
+            inp.dataset.dirty = 'false';
             await loadAndProveGoal(eq);
         }
 
         async function loadAndProveGoal(eq) {
-            document.getElementById('goal-input').value = eq;
+            const inp = document.getElementById('goal-input');
+            if (inp) {
+                inp.value = eq;
+                inp.dataset.dirty = 'false';
+            }
             const res = await fetch('/api/conjecture/custom', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1893,6 +1906,8 @@ pub const DASHBOARD_HTML: &str = r#"<!DOCTYPE html>
         }
 
         async function nextGoal() {
+            const inp = document.getElementById('goal-input');
+            if (inp) inp.dataset.dirty = 'false';
             currentConjectureIdx++;
             const res = await fetch('/api/conjecture', {
                 method: 'POST',

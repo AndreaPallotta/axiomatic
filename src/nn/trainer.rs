@@ -4,7 +4,6 @@ use super::optim::{AdamOptimizer, TrainingSample};
 use crate::search::mcts::MctsEngine;
 use crate::verifier::fol::{Equality, Term};
 use crate::verifier::kernel::{AxiomLibrary, ProofState};
-use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 /// Training progress metrics per epoch
@@ -44,30 +43,31 @@ impl ReplayBuffer {
 
 /// Generates diverse synthetic algebraic conjectures for Self-Play
 pub fn generate_synthetic_algebra_conjecture(difficulty: usize) -> Equality {
-    let mut rng = rand::thread_rng();
     let vars = ["x", "y", "z", "a", "b"];
-    let v1 = Term::constant(vars[rng.gen_range(0..vars.len())]);
-    let v2 = Term::constant(vars[rng.gen_range(0..vars.len())]);
+    let v1 = Term::constant(vars[difficulty % vars.len()]);
+    let v2 = Term::constant(vars[(difficulty + 1) % vars.len()]);
     let zero = Term::constant("0");
     let one = Term::constant("1");
 
-    match difficulty % 4 {
-        0 => {
-            // Identity: (v + 0) = (0 + v)
-            Equality::new(
-                Term::func("+", vec![v1.clone(), zero.clone()]),
-                Term::func("+", vec![zero.clone(), v1.clone()]),
-            )
-        }
-        1 => {
-            // Multiplication Identity: (v * 1) = (1 * v)
-            Equality::new(
-                Term::func("*", vec![v1.clone(), one.clone()]),
-                Term::func("*", vec![one.clone(), v1.clone()]),
-            )
-        }
+    let i = Term::constant("i");
+    let two = Term::constant("2");
+    let three = Term::constant("3");
+    let five = Term::constant("5");
+    let six = Term::constant("6");
+    let seven = Term::constant("7");
+    let ten = Term::constant("10");
+    let neg_one = Term::from_i64(-1);
+
+    match difficulty % 10 {
+        0 => Equality::new(
+            Term::func("+", vec![v1.clone(), zero.clone()]),
+            Term::func("+", vec![zero.clone(), v1.clone()]),
+        ),
+        1 => Equality::new(
+            Term::func("*", vec![v1.clone(), one.clone()]),
+            Term::func("*", vec![one.clone(), v1.clone()]),
+        ),
         2 => {
-            // Compound Commutativity: (v1 + 0) + (v2 * 1) = (1 * v2) + (0 + v1)
             let lhs = Term::func(
                 "+",
                 vec![
@@ -84,13 +84,52 @@ pub fn generate_synthetic_algebra_conjecture(difficulty: usize) -> Equality {
             );
             Equality::new(lhs, rhs)
         }
-        _ => {
-            // Commutative sum: (v1 + v2) = (v2 + v1)
-            Equality::new(
-                Term::func("+", vec![v1.clone(), v2.clone()]),
-                Term::func("+", vec![v2.clone(), v1.clone()]),
-            )
-        }
+        3 => Equality::new(
+            Term::func("+", vec![v1.clone(), v2.clone()]),
+            Term::func("+", vec![v2.clone(), v1.clone()]),
+        ),
+        4 => Equality::new(
+            Term::func(
+                "+",
+                vec![
+                    Term::func(
+                        "*",
+                        vec![
+                            Term::func("*", vec![two.clone(), two.clone()]),
+                            two.clone(),
+                        ],
+                    ),
+                    two,
+                ],
+            ),
+            ten,
+        ),
+        5 => Equality::new(
+            Term::func("+", vec![v1.clone(), Term::func("*", vec![two, three])]),
+            Term::func("+", vec![v1.clone(), six]),
+        ),
+        6 => Equality::new(
+            Term::func("+", vec![v1.clone(), Term::func("-", vec![seven, two])]),
+            Term::func("+", vec![v1.clone(), five]),
+        ),
+        7 => Equality::new(
+            Term::func("*", vec![i.clone(), i.clone()]),
+            neg_one.clone(),
+        ),
+        8 => Equality::new(
+            Term::func("*", vec![Term::func("*", vec![v1.clone(), i.clone()]), i.clone()]),
+            Term::func("-", vec![v1.clone()]),
+        ),
+        _ => Equality::new(
+            Term::func(
+                "*",
+                vec![
+                    Term::func("*", vec![i.clone(), i.clone()]),
+                    Term::func("*", vec![i.clone(), i.clone()]),
+                ],
+            ),
+            one,
+        ),
     }
 }
 
@@ -431,5 +470,13 @@ mod tests {
         let history = train_self_play_cycle(&mut model, &mut optimizer, &mut replay, &axioms, 2, 3);
         assert_eq!(history.len(), 2);
         assert!(history[0].total_samples_trained > 0);
+    }
+
+    #[test]
+    fn test_synthetic_algebra_conjecture_diversity() {
+        for diff in 0..10 {
+            let conj = generate_synthetic_algebra_conjecture(diff);
+            assert_ne!(conj.lhs, conj.rhs);
+        }
     }
 }

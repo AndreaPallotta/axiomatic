@@ -4,7 +4,7 @@ use crate::verifier::kernel::{AxiomLibrary, FormalVerifier, ProofState, Tactic};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
-pub const NUM_TACTIC_CLASSES: usize = 26; // 12 LHS rules + 12 RHS rules + Symm + Rfl
+pub const NUM_TACTIC_CLASSES: usize = 36; // 16 LHS + 16 RHS + Symm + Rfl + EvalLhs + EvalRhs
 
 /// A 2D Matrix of trainable weights
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -48,23 +48,16 @@ impl Matrix {
     }
 }
 
-/// A Two-Headed Deep Neural Network for Policy and Value Prediction
+/// 3-Layer Deep Neural Network for Mathematical Proof Guidance
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DeepProofNetwork {
-    // Hidden Layer 1: 32 -> 64
-    pub w1: Matrix,
+    pub w1: Matrix, // Layer 1: EMBEDDING_DIM -> 64
     pub b1: Vec<f64>,
-
-    // Hidden Layer 2: 64 -> 32
-    pub w2: Matrix,
+    pub w2: Matrix, // Layer 2: 64 -> 32
     pub b2: Vec<f64>,
-
-    // Policy Head: 32 -> NUM_TACTIC_CLASSES
-    pub w_policy: Matrix,
+    pub w_policy: Matrix, // Policy Head: 32 -> NUM_TACTIC_CLASSES
     pub b_policy: Vec<f64>,
-
-    // Value Head: 32 -> 1
-    pub w_value: Matrix,
+    pub w_value: Matrix, // Value Head: 32 -> 1
     pub b_value: Vec<f64>,
 }
 
@@ -84,7 +77,7 @@ impl DeepProofNetwork {
 
     /// GELU Activation Function
     pub fn gelu(x: f64) -> f64 {
-        0.5 * x * (1.0 + (0.79788456 * (x + 0.044715 * x.powi(3))).tanh())
+        0.5 * x * (1.0 + ((2.0 / std::f64::consts::PI).sqrt() * (x + 0.044715 * x.powi(3))).tanh())
     }
 
     /// Forward pass through the network:
@@ -140,7 +133,7 @@ impl DeepProofNetwork {
                     .iter()
                     .position(|(n, _)| n == rule_name)
                     .unwrap_or(0);
-                2 + (idx % 12)
+                2 + (idx % 16)
             }
             Tactic::RewriteRhs(rule_name) => {
                 let idx = axioms
@@ -148,8 +141,10 @@ impl DeepProofNetwork {
                     .iter()
                     .position(|(n, _)| n == rule_name)
                     .unwrap_or(0);
-                14 + (idx % 12)
+                18 + (idx % 16)
             }
+            Tactic::EvalArithmeticLhs => 34,
+            Tactic::EvalArithmeticRhs => 35,
             _ => 0,
         }
     }
@@ -271,20 +266,27 @@ impl ModelCheckpoint {
         let latest_path = format!("{}/checkpoint_latest.json", dir);
 
         if let Ok(ckpt) = Self::load_from_file(&best_path) {
-            println!("[INFO] Loaded existing model checkpoint from {}", best_path);
-            (ckpt.model, ckpt.total_epochs_trained, ckpt.best_loss)
-        } else if let Ok(ckpt) = Self::load_from_file(&latest_path) {
-            println!(
-                "[INFO] Loaded existing model checkpoint from {}",
-                latest_path
-            );
-            (ckpt.model, ckpt.total_epochs_trained, ckpt.best_loss)
-        } else if let Ok(ckpt) = serde_json::from_str::<ModelCheckpoint>(EMBEDDED_BASELINE_MODEL) {
-            println!("[INFO] Initialized from embedded pretrained baseline weights");
-            (ckpt.model, ckpt.total_epochs_trained, ckpt.best_loss)
-        } else {
-            (DeepProofNetwork::new_random(), 0, f64::INFINITY)
+            if ckpt.model.w_policy.rows == NUM_TACTIC_CLASSES {
+                println!("[INFO] Loaded existing model checkpoint from {}", best_path);
+                return (ckpt.model, ckpt.total_epochs_trained, ckpt.best_loss);
+            }
         }
+        if let Ok(ckpt) = Self::load_from_file(&latest_path) {
+            if ckpt.model.w_policy.rows == NUM_TACTIC_CLASSES {
+                println!(
+                    "[INFO] Loaded existing model checkpoint from {}",
+                    latest_path
+                );
+                return (ckpt.model, ckpt.total_epochs_trained, ckpt.best_loss);
+            }
+        }
+        if let Ok(ckpt) = serde_json::from_str::<ModelCheckpoint>(EMBEDDED_BASELINE_MODEL) {
+            if ckpt.model.w_policy.rows == NUM_TACTIC_CLASSES {
+                println!("[INFO] Initialized from embedded pretrained baseline weights");
+                return (ckpt.model, ckpt.total_epochs_trained, ckpt.best_loss);
+            }
+        }
+        (DeepProofNetwork::new_random(), 0, f64::INFINITY)
     }
 }
 

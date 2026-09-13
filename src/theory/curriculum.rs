@@ -212,22 +212,71 @@ impl CurriculumController {
                     Term::func("+", vec![x.clone(), zero.clone()]),
                 ),
             },
-            DifficultyLevel::Level5ComplexPolynomials => Equality::new(
-                Term::func(
-                    "+",
-                    vec![
+            DifficultyLevel::Level5ComplexPolynomials => {
+                let i = Term::constant("i");
+                let two = Term::constant("2");
+                let three = Term::constant("3");
+                let six = Term::constant("6");
+                let ten = Term::constant("10");
+                match seed % 5 {
+                    0 => Equality::new(
+                        Term::func(
+                            "+",
+                            vec![
+                                Term::func(
+                                    "*",
+                                    vec![Term::func("+", vec![x.clone(), zero.clone()]), one.clone()],
+                                ),
+                                Term::func(
+                                    "*",
+                                    vec![Term::func("+", vec![y.clone(), zero.clone()]), one.clone()],
+                                ),
+                            ],
+                        ),
+                        Term::func("+", vec![y.clone(), x.clone()]),
+                    ),
+                    1 => Equality::new(
+                        Term::func("*", vec![i.clone(), i.clone()]),
+                        Term::from_i64(-1),
+                    ),
+                    2 => Equality::new(
+                        Term::func(
+                            "+",
+                            vec![
+                                Term::func(
+                                    "*",
+                                    vec![
+                                        Term::func("*", vec![two.clone(), two.clone()]),
+                                        two.clone(),
+                                    ],
+                                ),
+                                two,
+                            ],
+                        ),
+                        ten,
+                    ),
+                    3 => Equality::new(
                         Term::func(
                             "*",
-                            vec![Term::func("+", vec![x.clone(), zero.clone()]), one.clone()],
+                            vec![
+                                Term::func("*", vec![x.clone(), i.clone()]),
+                                i,
+                            ],
                         ),
+                        Term::func("-", vec![x.clone()]),
+                    ),
+                    _ => Equality::new(
                         Term::func(
-                            "*",
-                            vec![Term::func("+", vec![y.clone(), zero.clone()]), one.clone()],
+                            "+",
+                            vec![
+                                x.clone(),
+                                Term::func("*", vec![two, three]),
+                            ],
                         ),
-                    ],
-                ),
-                Term::func("+", vec![y.clone(), x.clone()]),
-            ),
+                        Term::func("+", vec![x.clone(), six]),
+                    ),
+                }
+            }
         }
     }
 }
@@ -250,5 +299,22 @@ mod tests {
             curr.current_level,
             DifficultyLevel::Level2CommutativeAssociative
         );
+    }
+
+    #[test]
+    fn test_curriculum_level5_generation() {
+        let mut curr = CurriculumController::new();
+        curr.current_level = DifficultyLevel::Level5ComplexPolynomials;
+        let c0 = curr.generate_conjecture(0);
+        let c1 = curr.generate_conjecture(1);
+        let c2 = curr.generate_conjecture(2);
+        let c3 = curr.generate_conjecture(3);
+        let c4 = curr.generate_conjecture(4);
+
+        assert_ne!(c0.lhs, c0.rhs);
+        assert_eq!(c1.to_string(), "(i * i) = -1");
+        assert_eq!(c2.to_string(), "(((2 * 2) * 2) + 2) = 10");
+        assert_eq!(c3.to_string(), "((x * i) * i) = -x");
+        assert_eq!(c4.to_string(), "(x + (2 * 3)) = (x + 6)");
     }
 }

@@ -7,10 +7,16 @@ enum Token {
     Plus,
     Star,
     Minus,
+    Slash,
+    Caret,
     Ampersand,
     Pipe,
     Bang,
     Equal,
+    Le,
+    Ge,
+    Lt,
+    Gt,
     LParen,
     RParen,
     Comma,
@@ -38,6 +44,14 @@ fn tokenize(input: &str) -> Result<Vec<Token>, String> {
                 tokens.push(Token::Minus);
                 chars.next();
             }
+            '/' => {
+                tokens.push(Token::Slash);
+                chars.next();
+            }
+            '^' => {
+                tokens.push(Token::Caret);
+                chars.next();
+            }
             '&' | '∧' => {
                 tokens.push(Token::Ampersand);
                 chars.next();
@@ -52,6 +66,32 @@ fn tokenize(input: &str) -> Result<Vec<Token>, String> {
             }
             '=' => {
                 tokens.push(Token::Equal);
+                chars.next();
+            }
+            '<' => {
+                chars.next();
+                if let Some(&'=') = chars.peek() {
+                    chars.next();
+                    tokens.push(Token::Le);
+                } else {
+                    tokens.push(Token::Lt);
+                }
+            }
+            '>' => {
+                chars.next();
+                if let Some(&'=') = chars.peek() {
+                    chars.next();
+                    tokens.push(Token::Ge);
+                } else {
+                    tokens.push(Token::Gt);
+                }
+            }
+            '≤' => {
+                tokens.push(Token::Le);
+                chars.next();
+            }
+            '≥' => {
+                tokens.push(Token::Ge);
                 chars.next();
             }
             '(' => {
@@ -130,12 +170,86 @@ impl Parser {
         }
     }
 
-    /// Parses an equation: LHS = RHS
+    /// Parses an equation or relational proposition: LHS = RHS, LHS <= RHS, LHS >= RHS, etc.
     fn parse_equality(&mut self) -> Result<Equality, String> {
-        let lhs = self.parse_additive()?;
-        self.expect(Token::Equal)?;
-        let rhs = self.parse_additive()?;
-        Ok(Equality::new(lhs, rhs))
+        let lhs = self.parse_expr()?;
+        if let Some(tok) = self.peek() {
+            match tok {
+                Token::Equal => {
+                    self.next();
+                    let rhs = self.parse_expr()?;
+                    Ok(Equality::new(lhs, rhs))
+                }
+                Token::Le => {
+                    self.next();
+                    let rhs = self.parse_expr()?;
+                    Ok(Equality::new(Term::func("<=", vec![lhs, rhs]), Term::constant("true")))
+                }
+                Token::Ge => {
+                    self.next();
+                    let rhs = self.parse_expr()?;
+                    Ok(Equality::new(Term::func("<=", vec![rhs, lhs]), Term::constant("true")))
+                }
+                Token::Lt => {
+                    self.next();
+                    let rhs = self.parse_expr()?;
+                    Ok(Equality::new(Term::func("<", vec![lhs, rhs]), Term::constant("true")))
+                }
+                Token::Gt => {
+                    self.next();
+                    let rhs = self.parse_expr()?;
+                    Ok(Equality::new(Term::func("<", vec![rhs, lhs]), Term::constant("true")))
+                }
+                _ => {
+                    if let Term::Func(ref op, _) = lhs {
+                        if op == "<=" || op == "<" {
+                            return Ok(Equality::new(lhs, Term::constant("true")));
+                        }
+                    }
+                    Err(format!("Expected '=' or relational operator, found {:?}", tok))
+                }
+            }
+        } else {
+            if let Term::Func(ref op, _) = lhs {
+                if op == "<=" || op == "<" {
+                    return Ok(Equality::new(lhs, Term::constant("true")));
+                }
+            }
+            Err("Expected '=' or relational operator, found EOF".to_string())
+        }
+    }
+
+    /// Parses relational comparisons: A <= B, A >= B, A < B, A > B
+    fn parse_expr(&mut self) -> Result<Term, String> {
+        let mut left = self.parse_additive()?;
+
+        while let Some(tok) = self.peek() {
+            match tok {
+                Token::Le => {
+                    self.next();
+                    let right = self.parse_additive()?;
+                    left = Term::func("<=", vec![left, right]);
+                }
+                Token::Ge => {
+                    self.next();
+                    let right = self.parse_additive()?;
+                    left = Term::func("<=", vec![right, left]);
+                }
+                Token::Lt => {
+                    self.next();
+                    let right = self.parse_additive()?;
+                    left = Term::func("<", vec![left, right]);
+                }
+                Token::Gt => {
+                    self.next();
+                    let right = self.parse_additive()?;
+                    left = Term::func("<", vec![right, left]);
+                }
+                _ => break,
+            }
+        }
+
+        Ok(left)
     }
 
     /// Parses addition, subtraction, and Boolean OR: A + B, A - B, A | B
@@ -177,6 +291,16 @@ impl Parser {
                     let right = self.parse_primary()?;
                     left = Term::func("*", vec![left, right]);
                 }
+                Token::Slash => {
+                    self.next();
+                    let right = self.parse_primary()?;
+                    left = Term::func("/", vec![left, right]);
+                }
+                Token::Caret => {
+                    self.next();
+                    let right = self.parse_primary()?;
+                    left = Term::func("^", vec![left, right]);
+                }
                 Token::Ampersand => {
                     self.next();
                     let right = self.parse_primary()?;
@@ -193,7 +317,7 @@ impl Parser {
     fn parse_primary(&mut self) -> Result<Term, String> {
         match self.next() {
             Some(Token::LParen) => {
-                let expr = self.parse_additive()?;
+                let expr = self.parse_expr()?;
                 self.expect(Token::RParen)?;
                 Ok(expr)
             }
@@ -206,7 +330,7 @@ impl Parser {
                         self.next();
                     } else {
                         loop {
-                            args.push(self.parse_additive()?);
+                            args.push(self.parse_expr()?);
                             match self.peek() {
                                 Some(Token::Comma) => {
                                     self.next();

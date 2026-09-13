@@ -25,12 +25,98 @@ impl TheoryInventor {
             MathDomain::BooleanLogic => Self::invent_boolean(seed),
             MathDomain::SymbolicCalculus => Self::invent_calculus(seed),
             MathDomain::SetTheory => Self::invent_set_theory(seed),
-            MathDomain::Unified => match seed % 4 {
+            MathDomain::ComplexNumbers => Self::invent_complex(seed),
+            MathDomain::LinearAlgebra => Self::invent_linear_algebra(seed),
+            MathDomain::OrderTheory => Self::invent_order_theory(seed),
+            MathDomain::MultivariableCalculus => Self::invent_multivariable_calculus(seed),
+            MathDomain::Probability => Self::invent_probability(seed),
+            MathDomain::Unified => match seed % 9 {
                 0 => Self::invent_algebraic(seed),
                 1 => Self::invent_boolean(seed),
                 2 => Self::invent_calculus(seed),
-                _ => Self::invent_set_theory(seed),
+                3 => Self::invent_set_theory(seed),
+                4 => Self::invent_complex(seed),
+                5 => Self::invent_linear_algebra(seed),
+                6 => Self::invent_order_theory(seed),
+                7 => Self::invent_multivariable_calculus(seed),
+                _ => Self::invent_probability(seed),
             },
+        }
+    }
+
+    fn invent_multivariable_calculus(seed: usize) -> Equality {
+        let f = Term::constant("f");
+        match seed % 3 {
+            0 => Equality::new(
+                Term::func("Dx", vec![Term::func("Dy", vec![f.clone()])]),
+                Term::func("Dy", vec![Term::func("Dx", vec![f])]),
+            ),
+            1 => Equality::new(
+                Term::func("curl", vec![Term::func("grad", vec![f])]),
+                Term::constant("0"),
+            ),
+            _ => Equality::new(
+                Term::func("div", vec![Term::func("curl", vec![f])]),
+                Term::constant("0"),
+            ),
+        }
+    }
+
+    fn invent_probability(seed: usize) -> Equality {
+        let a = Term::constant("A");
+        let b = Term::constant("B");
+        match seed % 3 {
+            0 => Equality::new(
+                Term::func("P", vec![Term::constant("U")]),
+                Term::constant("1"),
+            ),
+            1 => Equality::new(
+                Term::func("*", vec![Term::func("cond", vec![a.clone(), b.clone()]), Term::func("P", vec![b.clone()])]),
+                Term::func("*", vec![Term::func("cond", vec![b, a.clone()]), Term::func("P", vec![a])]),
+            ),
+            _ => Equality::new(
+                Term::func("P", vec![Term::constant("0")]),
+                Term::constant("0"),
+            ),
+        }
+    }
+
+    fn invent_linear_algebra(seed: usize) -> Equality {
+        let a = Term::constant("A");
+        let b = Term::constant("B");
+        match seed % 4 {
+            0 => Equality::new(
+                Term::func("T", vec![Term::func("+", vec![a.clone(), b.clone()])]),
+                Term::func("+", vec![Term::func("T", vec![a]), Term::func("T", vec![b])]),
+            ),
+            1 => Equality::new(
+                Term::func("T", vec![Term::func("*", vec![a.clone(), b.clone()])]),
+                Term::func("*", vec![Term::func("T", vec![b]), Term::func("T", vec![a])]),
+            ),
+            2 => Equality::new(
+                Term::func("T", vec![Term::func("T", vec![a.clone()])]),
+                a,
+            ),
+            _ => Equality::new(
+                Term::func("tr", vec![Term::func("+", vec![a.clone(), b.clone()])]),
+                Term::func("+", vec![Term::func("tr", vec![a]), Term::func("tr", vec![b])]),
+            ),
+        }
+    }
+
+    fn invent_order_theory(seed: usize) -> Equality {
+        let x = Term::constant("x");
+        let zero = Term::constant("0");
+        let t = Term::constant("true");
+        match seed % 2 {
+            0 => Equality::new(
+                Term::func("<=", vec![x.clone(), x]),
+                t,
+            ),
+            _ => Equality::new(
+                Term::func("<=", vec![zero, Term::func("*", vec![x.clone(), x])]),
+                t,
+            ),
         }
     }
 
@@ -657,6 +743,67 @@ impl TheoryInventor {
         }
     }
 
+    fn invent_complex(seed: usize) -> Equality {
+        let vars = ["x", "y", "z", "a", "b", "u", "v"];
+        let x = Term::constant(vars[seed % vars.len()]);
+        let y = Term::constant(vars[(seed + 1) % vars.len()]);
+        let i = Term::constant("i");
+        let zero = Term::constant("0");
+        let one = Term::constant("1");
+        let neg_one = Term::from_i64(-1);
+
+        match seed % 6 {
+            0 => Equality::new(
+                Term::func("*", vec![i.clone(), i.clone()]),
+                neg_one,
+            ),
+            1 => Equality::new(
+                Term::func("*", vec![Term::func("*", vec![x.clone(), i.clone()]), i.clone()]),
+                Term::func("-", vec![x]),
+            ),
+            2 => Equality::new(
+                Term::func(
+                    "+",
+                    vec![
+                        Term::func("*", vec![Term::func("*", vec![x.clone(), i.clone()]), i.clone()]),
+                        x,
+                    ],
+                ),
+                zero,
+            ),
+            3 => Equality::new(
+                Term::func(
+                    "*",
+                    vec![
+                        Term::func("*", vec![x.clone(), i.clone()]),
+                        Term::func("*", vec![y.clone(), i.clone()]),
+                    ],
+                ),
+                Term::func("-", vec![Term::func("*", vec![x, y])]),
+            ),
+            4 => Equality::new(
+                Term::func(
+                    "*",
+                    vec![
+                        Term::func("*", vec![i.clone(), i.clone()]),
+                        Term::func("*", vec![i.clone(), i.clone()]),
+                    ],
+                ),
+                one,
+            ),
+            _ => Equality::new(
+                Term::func(
+                    "*",
+                    vec![
+                        Term::func("+", vec![Term::func("*", vec![i.clone(), i.clone()]), one]),
+                        x,
+                    ],
+                ),
+                zero,
+            ),
+        }
+    }
+
     /// Evaluates whether a conjecture is non-trivial and mathematically interesting
     pub fn is_non_trivial(conjecture: &Equality) -> bool {
         // 1. Discard trivial reflexivity (A = A)
@@ -704,5 +851,8 @@ mod tests {
 
         let calc_thm = TheoryInventor::invent_for_domain(MathDomain::SymbolicCalculus, 0);
         assert!(TheoryInventor::is_non_trivial(&calc_thm));
+
+        let complex_thm = TheoryInventor::invent_for_domain(MathDomain::ComplexNumbers, 0);
+        assert!(TheoryInventor::is_non_trivial(&complex_thm));
     }
 }

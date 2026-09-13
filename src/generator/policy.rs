@@ -97,9 +97,14 @@ impl NeuralPolicy for SymbolicNeuralPolicy {
 
             // 3. Identity and Zero rules get natural boost
             if let Tactic::RewriteLhs(r) | Tactic::RewriteRhs(r) = tactic {
-                if r.contains("zero") || r.contains("one") || r.contains("inv") {
+                if r.contains("zero") || r.contains("one") || r.contains("inv") || r.contains("squared") {
                     score += 3.0;
                 }
+            }
+
+            // 4. Arithmetic evaluation gets high priority when available
+            if matches!(tactic, Tactic::EvalArithmeticLhs | Tactic::EvalArithmeticRhs) {
+                score += 8.0;
             }
 
             scores.push((*tactic == Tactic::Reflexivity, score));

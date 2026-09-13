@@ -1,3 +1,4 @@
+pub mod eval;
 pub mod exporter;
 pub mod fol;
 pub mod induction;
@@ -7,6 +8,10 @@ pub mod lean_runner;
 pub mod parser;
 pub mod trace;
 
+pub use eval::{
+    eval_full_arithmetic, eval_step_arithmetic, find_counterexample, find_polynomial_roots,
+    ComplexInt, ComplexRational, Counterexample, Rational,
+};
 pub use exporter::MultiFormatExporter;
 pub use fol::{apply_rewrite, unify, Equality, Term};
 pub use induction::InductionEngine;

@@ -1,9 +1,9 @@
 #![allow(unused_variables, dead_code, clippy::all)]
 
 use axiomatic::{
-    export_to_lean4, parse_conjecture, AxiomLibrary, Equality, Lean4Validator,
-    LeanValidationResult, LemmaDatabase, MctsEngine, ProofState, SymbolicNeuralPolicy, Term,
-    TraceExporter,
+    export_to_lean4, find_polynomial_roots, parse_conjecture, AxiomLibrary, Equality,
+    Lean4Validator, LeanValidationResult, LemmaDatabase, MctsEngine, ProofState,
+    SymbolicNeuralPolicy, Term, TraceExporter,
 };
 use std::env;
 use std::path::Path;
@@ -172,7 +172,7 @@ fn run_neural_network_training(
 ) {
     print_banner();
 
-    let axioms = AxiomLibrary::standard_algebra();
+    let axioms = AxiomLibrary::unified_multidomain();
     let (mut model, prior_epochs, prior_loss) =
         axiomatic::ModelCheckpoint::try_load_or_init(checkpoint_dir);
 
@@ -247,15 +247,74 @@ fn run_autonomous_proof_cli(custom_conjecture: Option<&str>) {
         (default_target_conjecture(), false)
     };
 
-    let axioms = if is_bool {
+    let is_matrix = target_eq.lhs.contains_symbol("T") || target_eq.rhs.contains_symbol("T")
+        || target_eq.lhs.contains_symbol("tr") || target_eq.rhs.contains_symbol("tr")
+        || target_eq.lhs.contains_symbol("det") || target_eq.rhs.contains_symbol("det")
+        || target_eq.lhs.contains_symbol("inv") || target_eq.rhs.contains_symbol("inv");
+
+    let is_order = target_eq.lhs.contains_symbol("<=") || target_eq.rhs.contains_symbol("<=")
+        || target_eq.lhs.contains_symbol("<") || target_eq.rhs.contains_symbol("<");
+
+    let is_calculus = target_eq.lhs.contains_symbol("D") || target_eq.rhs.contains_symbol("D")
+        || target_eq.lhs.contains_symbol("Int") || target_eq.rhs.contains_symbol("Int")
+        || target_eq.lhs.contains_symbol("exp") || target_eq.rhs.contains_symbol("exp")
+        || target_eq.lhs.contains_symbol("sin") || target_eq.rhs.contains_symbol("sin")
+        || target_eq.lhs.contains_symbol("cos") || target_eq.rhs.contains_symbol("cos")
+        || target_eq.lhs.contains_symbol("sinh") || target_eq.rhs.contains_symbol("sinh")
+        || target_eq.lhs.contains_symbol("cosh") || target_eq.rhs.contains_symbol("cosh");
+
+    let is_multivar = target_eq.lhs.contains_symbol("Dx") || target_eq.rhs.contains_symbol("Dx")
+        || target_eq.lhs.contains_symbol("Dy") || target_eq.rhs.contains_symbol("Dy")
+        || target_eq.lhs.contains_symbol("Dt") || target_eq.rhs.contains_symbol("Dt")
+        || target_eq.lhs.contains_symbol("grad") || target_eq.rhs.contains_symbol("grad")
+        || target_eq.lhs.contains_symbol("div") || target_eq.rhs.contains_symbol("div")
+        || target_eq.lhs.contains_symbol("curl") || target_eq.rhs.contains_symbol("curl")
+        || target_eq.lhs.contains_symbol("laplacian") || target_eq.rhs.contains_symbol("laplacian");
+
+    let is_prob = target_eq.lhs.contains_symbol("P") || target_eq.rhs.contains_symbol("P")
+        || target_eq.lhs.contains_symbol("cond") || target_eq.rhs.contains_symbol("cond");
+
+    println!("[TARGET] Conjecture: {}\n", target_eq);
+
+    // Active Counterexample Falsification Check
+    if let Some(ce) = axiomatic::find_counterexample(&target_eq) {
+        println!("================================================================================");
+        println!("[COUNTEREXAMPLE REFUTATION] Conjecture is mathematically FALSE!");
+        println!("  - Disproved by concrete witness assignment:");
+        for (var, val) in &ce.assignments {
+            println!("    * {} = {}", var, val);
+        }
+        println!("  - Evaluated LHS: {}", ce.lhs_val);
+        println!("  - Evaluated RHS: {}", ce.rhs_val);
+        println!("  - Status: REFUTED by Sound Valuation Engine (no search hallucination)");
+        println!("================================================================================\n");
+        return;
+    }
+
+    let axioms = if is_matrix {
+        println!("[DOMAIN] Detected Non-Commutative Linear Algebra Domain");
+        AxiomLibrary::linear_algebra()
+    } else if is_order {
+        println!("[DOMAIN] Detected Real Order Theory Domain");
+        AxiomLibrary::order_theory()
+    } else if is_bool {
         println!("[DOMAIN] Detected Propositional Boolean Logic Domain");
         AxiomLibrary::boolean_logic()
+    } else if is_multivar {
+        println!("[DOMAIN] Detected Multivariable Calculus & Vector Field Domain");
+        AxiomLibrary::multivariable_calculus()
+    } else if is_prob {
+        println!("[DOMAIN] Detected Axiomatic Probability Theory Domain");
+        AxiomLibrary::probability()
+    } else if is_calculus {
+        println!("[DOMAIN] Detected Symbolic Calculus & Differential Equations Domain");
+        AxiomLibrary::symbolic_calculus()
     } else {
-        AxiomLibrary::standard_algebra()
+        AxiomLibrary::unified_multidomain()
     };
 
     let (model, epochs, _) = axiomatic::ModelCheckpoint::try_load_or_init("models");
-    let policy: Box<dyn axiomatic::NeuralPolicy> = if is_bool {
+    let policy: Box<dyn axiomatic::NeuralPolicy> = if is_bool || is_matrix || is_order || is_calculus || is_multivar || is_prob {
         Box::new(SymbolicNeuralPolicy::new())
     } else {
         if epochs > 0 {
@@ -269,10 +328,9 @@ fn run_autonomous_proof_cli(custom_conjecture: Option<&str>) {
         Box::new(axiomatic::DeepNeuralPolicy::new(model))
     };
 
-    println!("[TARGET] Conjecture: {}\n", target_eq);
-
     let initial_state = ProofState::new(target_eq.clone());
-    let mut mcts = MctsEngine::new(initial_state, 8);
+    let max_children = if is_calculus || is_multivar || is_prob { 12 } else { 8 };
+    let mut mcts = MctsEngine::new(initial_state, max_children);
 
     let start = std::time::Instant::now();
     let proof = mcts.run_search(policy.as_ref(), &axioms, 250);
@@ -335,7 +393,71 @@ fn run_autonomous_proof_cli(custom_conjecture: Option<&str>) {
             }
         }
     } else {
-        println!("[FAILED] Search exhausted max iterations without reaching formal proof state.");
+        let vars = target_eq.extract_variables();
+        if vars.len() == 1 {
+            let var = &vars[0];
+            println!("[POLYNOMIAL CONSTRAINT] Equation is not an identity over all values of '{}'.", var);
+            println!("[SOLVER] Discovering and proving all roots in the complex domain C...");
+            let roots = find_polynomial_roots(&target_eq, var, 6);
+            if !roots.is_empty() {
+                println!("[DISCOVERY] Found {} formal root(s) satisfying {}:", roots.len(), target_eq);
+                for (idx, root) in roots.iter().enumerate() {
+                    println!("  Root {}: {} = {}", idx + 1, var, root);
+                }
+                println!();
+
+                let proofs_dir = Path::new("proofs");
+                for (idx, root) in roots.iter().enumerate() {
+                    let subst_eq = target_eq.replace_variable(var, root);
+                    println!("--------------------------------------------------------------------------------");
+                    println!("[ROOT {}/{}] Proving satisfaction for {} = {}:", idx + 1, roots.len(), var, root);
+                    println!("  Substituted Goal: {}", subst_eq);
+
+                    let root_state = ProofState::new(subst_eq.clone());
+                    let mut root_mcts = MctsEngine::new(root_state, 8);
+                    let root_start = std::time::Instant::now();
+                    let root_proof = root_mcts.run_search(policy.as_ref(), &axioms, 100);
+                    let root_elapsed = root_start.elapsed();
+
+                    if let Some(solved_root) = root_proof {
+                        println!(
+                            "  [Q.E.D.] Root verified in {:.3} ms ({} tactic steps)",
+                            root_elapsed.as_secs_f64() * 1000.0,
+                            solved_root.proof_history.len()
+                        );
+                        println!("  Formal Proof Derivation:");
+                        for (step_i, (tactic, desc)) in solved_root.proof_history.iter().enumerate() {
+                            println!("    Step {}. [{}] -> {}", step_i + 1, tactic, desc);
+                        }
+
+                        let theorem_name = format!("polynomial_root_{}", idx + 1);
+                        let (val_result, artifact_path) =
+                            Lean4Validator::save_and_validate_proof(&theorem_name, &solved_root, proofs_dir);
+                        match val_result {
+                            LeanValidationResult::Certified { elapsed_ms, lean_version } => {
+                                println!("  Lean 4 Certification: CERTIFIED ({:.3} ms, {})", elapsed_ms, lean_version);
+                                println!("  Artifact: {}", artifact_path.display());
+                            }
+                            LeanValidationResult::CompilerError { stderr, stdout } => {
+                                println!("  Lean 4 Certification: COMPILER REJECTED");
+                                if !stderr.is_empty() {
+                                    println!("    {}", stderr.trim());
+                                }
+                            }
+                            LeanValidationResult::LeanNotInstalled { message } => {
+                                println!("  Lean 4 Artifact saved: {} ({})", artifact_path.display(), message);
+                            }
+                        }
+                    } else {
+                        println!("  [FAILED] Search exhausted max iterations for root {}", root);
+                    }
+                }
+            } else {
+                println!("[FAILED] Search exhausted max iterations without reaching formal proof state.");
+            }
+        } else {
+            println!("[FAILED] Search exhausted max iterations without reaching formal proof state.");
+        }
     }
     println!("================================================================================\n");
 }

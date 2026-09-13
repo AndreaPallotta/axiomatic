@@ -54,7 +54,7 @@ impl Term {
     pub fn contains_symbol(&self, sym: &str) -> bool {
         match self {
             Term::Var(name) | Term::Const(name) => name == sym,
-            Term::Func(_, args) => args.iter().any(|arg| arg.contains_symbol(sym)),
+            Term::Func(name, args) => name == sym || args.iter().any(|arg| arg.contains_symbol(sym)),
         }
     }
 
@@ -100,6 +100,50 @@ impl Term {
         symbols.dedup();
         symbols
     }
+
+    pub fn extract_variables(&self) -> Vec<String> {
+        let mut vars = Vec::new();
+        match self {
+            Term::Var(name) => {
+                vars.push(name.clone());
+            }
+            Term::Const(name) => {
+                if name.parse::<i64>().is_err() && name != "i" && name != "true" && name != "false" && name != "I" && name != "U" {
+                    vars.push(name.clone());
+                }
+            }
+            Term::Func(_, args) => {
+                for arg in args {
+                    vars.extend(arg.extract_variables());
+                }
+            }
+        }
+        vars.sort();
+        vars.dedup();
+        vars
+    }
+
+    pub fn as_i64(&self) -> Option<i64> {
+        match self {
+            Term::Const(s) => s.parse::<i64>().ok(),
+            Term::Func(op, args) if op == "-" && args.len() == 1 => {
+                args[0].as_i64().map(|v| -v)
+            }
+            _ => None,
+        }
+    }
+
+    pub fn from_i64(val: i64) -> Self {
+        if val < 0 {
+            Term::Func("-".to_string(), vec![Term::Const((-val).to_string())])
+        } else {
+            Term::Const(val.to_string())
+        }
+    }
+
+    pub fn is_numeric(&self) -> bool {
+        self.as_i64().is_some()
+    }
 }
 
 impl fmt::Display for Term {
@@ -114,7 +158,12 @@ impl fmt::Display for Term {
                         || name == "·"
                         || name == "^"
                         || name == "&"
-                        || name == "|")
+                        || name == "|"
+                        || name == "/"
+                        || name == "<="
+                        || name == "<"
+                        || name == ">="
+                        || name == ">")
                 {
                     write!(f, "({} {} {})", args[0], name, args[1])
                 } else if args.len() == 1 && (name == "-" || name == "!") {
@@ -152,6 +201,21 @@ impl Equality {
             lhs: self.rhs.clone(),
             rhs: self.lhs.clone(),
         }
+    }
+
+    pub fn replace_variable(&self, var_name: &str, replacement: &Term) -> Self {
+        Self {
+            lhs: self.lhs.replace_variable(var_name, replacement),
+            rhs: self.rhs.replace_variable(var_name, replacement),
+        }
+    }
+
+    pub fn extract_variables(&self) -> Vec<String> {
+        let mut vars = self.lhs.extract_variables();
+        vars.extend(self.rhs.extract_variables());
+        vars.sort();
+        vars.dedup();
+        vars
     }
 }
 

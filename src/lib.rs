@@ -22,9 +22,10 @@ pub use nn::{
 pub use search::{MctsEngine, MctsNode, SearchEvent, SearchGraphSnapshot};
 pub use theory::{CurriculumController, DifficultyLevel, InventedTheorem, TheoryInventor};
 pub use verifier::{
-    export_equality_to_lean4, export_to_lean4, is_boolean_equality, parse_conjecture, term_to_lean,
-    AxiomLibrary, Equality, FormalVerifier, Goal, InductionEngine, Lean4Validator,
-    LeanValidationResult, MultiFormatExporter, ProofState, StaticProofTrace, Tactic, Term,
-    TraceExporter,
+    export_equality_to_lean4, export_to_lean4, find_counterexample, find_polynomial_roots,
+    is_boolean_equality, parse_conjecture, term_to_lean, AxiomLibrary, ComplexInt,
+    ComplexRational, Counterexample, Equality, FormalVerifier, Goal, InductionEngine,
+    Lean4Validator, LeanValidationResult, MultiFormatExporter, ProofState, Rational,
+    StaticProofTrace, Tactic, Term, TraceExporter,
 };
 pub use visualizer::{start_visualizer_server, EngineController};
