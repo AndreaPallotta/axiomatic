@@ -433,8 +433,9 @@ fn generate_html_showcase(json_data: &str, trace: &StaticProofTrace) -> String {
         </div>
         <nav class="demo-nav">
             <span class="demo-label">Showcases:</span>
-            <a id="demoLinkMain" href="./" class="demo-chip">Nested Ring (1,670 Nodes)</a>
+            <a id="demoLinkMain" href="./" class="demo-chip">Multi-Var Reduction (1,937 Nodes)</a>
             <a id="demoLinkCompound" href="./compound/" class="demo-chip">Compound Algebra</a>
+            <a id="demoLinkCalc" href="./calculus/" class="demo-chip">Symbolic Calculus</a>
             <a id="demoLinkBool" href="./bool/" class="demo-chip">Boolean Logic</a>
         </nav>
         <div class="badges">
@@ -894,17 +895,21 @@ fn generate_html_showcase(json_data: &str, trace: &StaticProofTrace) -> String {
         }}
 
         const currentPath = window.location.pathname;
-        const isSubdir = currentPath.includes('/compound') || currentPath.includes('/bool');
+        const isSubdir = currentPath.includes('/compound') || currentPath.includes('/bool') || currentPath.includes('/calculus');
         const rootPrefix = isSubdir ? '../' : './';
         const linkMain = document.getElementById('demoLinkMain');
         const linkCompound = document.getElementById('demoLinkCompound');
+        const linkCalc = document.getElementById('demoLinkCalc');
         const linkBool = document.getElementById('demoLinkBool');
-        if (linkMain && linkCompound && linkBool) {{
+        if (linkMain && linkCompound && linkCalc && linkBool) {{
             linkMain.href = rootPrefix;
             linkCompound.href = rootPrefix + 'compound/';
+            linkCalc.href = rootPrefix + 'calculus/';
             linkBool.href = rootPrefix + 'bool/';
             if (currentPath.includes('/compound')) {{
                 linkCompound.classList.add('active');
+            }} else if (currentPath.includes('/calculus')) {{
+                linkCalc.classList.add('active');
             }} else if (currentPath.includes('/bool')) {{
                 linkBool.classList.add('active');
             }} else {{

@@ -100,17 +100,21 @@ async fn main() {
         "prove" | "search" => {
             let mut custom: Option<&str> = None;
             let mut induction_var: Option<&str> = None;
+            let mut domain_arg: Option<&str> = None;
             let mut i = 2;
             while i < args.len() {
                 if (args[i] == "--induction" || args[i] == "-i") && i + 1 < args.len() {
                     induction_var = Some(&args[i + 1]);
+                    i += 1;
+                } else if (args[i] == "--domain" || args[i] == "-d") && i + 1 < args.len() {
+                    domain_arg = Some(&args[i + 1]);
                     i += 1;
                 } else if custom.is_none() && !args[i].starts_with('-') {
                     custom = Some(&args[i]);
                 }
                 i += 1;
             }
-            run_autonomous_proof_cli(custom, induction_var);
+            run_autonomous_proof_cli(custom, domain_arg, induction_var);
         }
         "serve" | "ui" | "dashboard" => {
             let port = args.get(2).and_then(|p| p.parse().ok()).unwrap_or(3000);
@@ -128,10 +132,17 @@ async fn main() {
             let mut emit_html = false;
             let mut iterations = 150;
             let mut name = "showcase_theorem".to_string();
+            let mut domain_arg: Option<String> = None;
 
             let mut i = 2;
             while i < args.len() {
                 match args[i].as_str() {
+                    "--domain" | "-d" => {
+                        if let Some(val) = args.get(i + 1) {
+                            domain_arg = Some(val.clone());
+                            i += 1;
+                        }
+                    }
                     "--out" | "-o" => {
                         if let Some(val) = args.get(i + 1) {
                             out_dir = val.clone();
@@ -167,6 +178,7 @@ async fn main() {
                 emit_html,
                 iterations,
                 &name,
+                domain_arg.as_deref(),
             );
         }
         _ => {
@@ -233,30 +245,32 @@ fn default_target_conjecture() -> Equality {
     Equality::new(lhs, rhs)
 }
 
-/// Runs CLI proof discovery on algebraic goals
-fn run_autonomous_proof_cli(custom_conjecture: Option<&str>, induction_var: Option<&str>) {
-    print_banner();
-    println!("[INFO] Initiating Neurosymbolic MCTS Proof Search");
-    println!("================================================================================");
-
-    let (target_eq, is_bool) = if let Some(conjecture_str) = custom_conjecture {
-        match parse_conjecture(conjecture_str) {
-            Ok(eq) => {
-                println!("[INPUT] Parsed target conjecture: {}", eq);
-                let is_b = axiomatic::is_boolean_equality(&eq);
-                (eq, is_b)
-            }
-            Err(e) => {
-                println!(
-                    "[WARN] Failed to parse input '{}': {}. Using default conjecture.",
-                    conjecture_str, e
-                );
-                (default_target_conjecture(), false)
-            }
-        }
-    } else {
-        (default_target_conjecture(), false)
-    };
+fn resolve_domain_and_axioms(
+    target_eq: &Equality,
+    domain_override: Option<&str>,
+) -> (AxiomLibrary, &'static str, usize, bool) {
+    if let Some(d) = domain_override {
+        return match d {
+            "boolean" | "bool" => (AxiomLibrary::boolean_logic(), "Propositional Boolean Logic", 8, true),
+            "algebra" => (AxiomLibrary::standard_algebra(), "Abstract Algebra", 12, false),
+            "calculus" => (AxiomLibrary::symbolic_calculus(), "Symbolic Calculus & Differential Equations", 12, true),
+            "multivar" => (AxiomLibrary::multivariable_calculus(), "Multivariable Calculus & Vector Field", 12, true),
+            "group" => (AxiomLibrary::group_theory(), "Abstract Group Theory", 12, true),
+            "category" => (AxiomLibrary::category_theory(), "Category Theory & Functorial Rewriting", 12, true),
+            "transforms" => (AxiomLibrary::integral_transforms(), "Integral Transforms (Fourier & Laplace)", 12, true),
+            "info" => (AxiomLibrary::information_theory(), "Information Theory & Shannon Entropy", 12, true),
+            "order" => (AxiomLibrary::order_theory(), "Real Order Theory", 12, true),
+            "topology" => (AxiomLibrary::topology(), "General Topology & Kuratowski Closure", 12, true),
+            "exterior" => (AxiomLibrary::exterior_calculus(), "Exterior Calculus & Differential Forms", 12, true),
+            "combinatorics" => (AxiomLibrary::combinatorics(), "Combinatorics & Generating Functions", 12, true),
+            "control" => (AxiomLibrary::control_theory(), "Control Theory & Dynamical Systems", 12, true),
+            "matrix" | "linear_algebra" => (AxiomLibrary::linear_algebra(), "Non-Commutative Linear Algebra", 12, true),
+            "set" | "set_theory" => (AxiomLibrary::set_theory(), "Set Theory & Boolean Algebra", 8, true),
+            "complex" => (AxiomLibrary::complex_numbers(), "Complex Arithmetic & Imaginary Unit", 12, true),
+            "unified" => (AxiomLibrary::unified_multidomain(), "Unified Multi-Domain Logic", 12, true),
+            _ => (AxiomLibrary::standard_algebra(), "Abstract Algebra", 12, false),
+        };
+    }
 
     let is_matrix = target_eq.lhs.contains_symbol("T") || target_eq.rhs.contains_symbol("T")
         || target_eq.lhs.contains_symbol("tr") || target_eq.rhs.contains_symbol("tr")
@@ -322,6 +336,69 @@ fn run_autonomous_proof_cli(custom_conjecture: Option<&str>, induction_var: Opti
     let is_control = target_eq.lhs.contains_symbol("transfer_fn") || target_eq.rhs.contains_symbol("transfer_fn")
         || (target_eq.lhs.contains_symbol("T") && target_eq.rhs.contains_symbol("Q"));
 
+    let is_bool = axiomatic::is_boolean_equality(target_eq);
+
+    if is_topology {
+        (AxiomLibrary::topology(), "General Topology & Kuratowski Closure", 12, true)
+    } else if is_exterior {
+        (AxiomLibrary::exterior_calculus(), "Exterior Calculus & Differential Forms", 12, true)
+    } else if is_combinatorics {
+        (AxiomLibrary::combinatorics(), "Combinatorics & Generating Functions", 12, true)
+    } else if is_control {
+        (AxiomLibrary::control_theory(), "Control Theory & Dynamical Systems", 12, true)
+    } else if is_group {
+        (AxiomLibrary::group_theory(), "Abstract Group Theory", 12, true)
+    } else if is_matrix {
+        (AxiomLibrary::linear_algebra(), "Non-Commutative Linear Algebra", 12, true)
+    } else if is_category {
+        (AxiomLibrary::category_theory(), "Category Theory & Functorial Rewriting", 12, true)
+    } else if is_transforms {
+        (AxiomLibrary::integral_transforms(), "Integral Transforms (Fourier & Laplace)", 12, true)
+    } else if is_info {
+        (AxiomLibrary::information_theory(), "Information Theory & Shannon Entropy", 12, true)
+    } else if is_order {
+        (AxiomLibrary::order_theory(), "Real Order Theory", 12, true)
+    } else if is_bool {
+        (AxiomLibrary::boolean_logic(), "Propositional Boolean Logic", 8, true)
+    } else if is_multivar {
+        (AxiomLibrary::multivariable_calculus(), "Multivariable Calculus & Vector Field", 12, true)
+    } else if is_prob {
+        (AxiomLibrary::probability(), "Axiomatic Probability Theory", 12, true)
+    } else if is_calculus {
+        (AxiomLibrary::symbolic_calculus(), "Symbolic Calculus & Differential Equations", 12, true)
+    } else {
+        (AxiomLibrary::standard_algebra(), "Abstract Algebra", 12, false)
+    }
+}
+
+/// Runs CLI proof discovery on algebraic goals
+fn run_autonomous_proof_cli(
+    custom_conjecture: Option<&str>,
+    domain_arg: Option<&str>,
+    induction_var: Option<&str>,
+) {
+    print_banner();
+    println!("[INFO] Initiating Neurosymbolic MCTS Proof Search");
+    println!("================================================================================");
+
+    let target_eq = if let Some(conjecture_str) = custom_conjecture {
+        match parse_conjecture(conjecture_str) {
+            Ok(eq) => {
+                println!("[INPUT] Parsed target conjecture: {}", eq);
+                eq
+            }
+            Err(e) => {
+                println!(
+                    "[WARN] Failed to parse input '{}': {}. Using default conjecture.",
+                    conjecture_str, e
+                );
+                default_target_conjecture()
+            }
+        }
+    } else {
+        default_target_conjecture()
+    };
+
     println!("[TARGET] Conjecture: {}\n", target_eq);
 
     // Active Counterexample Falsification Check
@@ -335,55 +412,13 @@ fn run_autonomous_proof_cli(custom_conjecture: Option<&str>, induction_var: Opti
         println!("  - Evaluated LHS: {}", ce.lhs_val);
         println!("  - Evaluated RHS: {}", ce.rhs_val);
         println!("  - Status: REFUTED by Sound Valuation Engine (no search hallucination)");
-        println!("================================================================================\n");
+        println!("================================================================================");
         return;
     }
 
-    let axioms = if is_topology {
-        println!("[DOMAIN] Detected General Topology & Kuratowski Closure Domain");
-        AxiomLibrary::topology()
-    } else if is_exterior {
-        println!("[DOMAIN] Detected Exterior Calculus & Differential Forms Domain");
-        AxiomLibrary::exterior_calculus()
-    } else if is_combinatorics {
-        println!("[DOMAIN] Detected Combinatorics & Generating Functions Domain");
-        AxiomLibrary::combinatorics()
-    } else if is_control {
-        println!("[DOMAIN] Detected Control Theory & Dynamical Systems Domain");
-        AxiomLibrary::control_theory()
-    } else if is_group {
-        println!("[DOMAIN] Detected Abstract Group Theory Domain");
-        AxiomLibrary::group_theory()
-    } else if is_matrix {
-        println!("[DOMAIN] Detected Non-Commutative Linear Algebra Domain");
-        AxiomLibrary::linear_algebra()
-    } else if is_category {
-        println!("[DOMAIN] Detected Category Theory & Functorial Rewriting Domain");
-        AxiomLibrary::category_theory()
-    } else if is_transforms {
-        println!("[DOMAIN] Detected Integral Transforms (Fourier & Laplace) Domain");
-        AxiomLibrary::integral_transforms()
-    } else if is_info {
-        println!("[DOMAIN] Detected Information Theory & Shannon Entropy Domain");
-        AxiomLibrary::information_theory()
-    } else if is_order {
-        println!("[DOMAIN] Detected Real Order Theory Domain");
-        AxiomLibrary::order_theory()
-    } else if is_bool {
-        println!("[DOMAIN] Detected Propositional Boolean Logic Domain");
-        AxiomLibrary::boolean_logic()
-    } else if is_multivar {
-        println!("[DOMAIN] Detected Multivariable Calculus & Vector Field Domain");
-        AxiomLibrary::multivariable_calculus()
-    } else if is_prob {
-        println!("[DOMAIN] Detected Axiomatic Probability Theory Domain");
-        AxiomLibrary::probability()
-    } else if is_calculus {
-        println!("[DOMAIN] Detected Symbolic Calculus & Differential Equations Domain");
-        AxiomLibrary::symbolic_calculus()
-    } else {
-        AxiomLibrary::unified_multidomain()
-    };
+    let (axioms, domain_label, max_children, is_symbolic) =
+        resolve_domain_and_axioms(&target_eq, domain_arg);
+    println!("[DOMAIN] Detected {}", domain_label);
 
     if let Some(var) = induction_var {
         println!("================================================================================");
@@ -442,7 +477,7 @@ fn run_autonomous_proof_cli(custom_conjecture: Option<&str>, induction_var: Opti
     }
 
     let (model, epochs, _) = axiomatic::ModelCheckpoint::try_load_or_init("models");
-    let policy: Box<dyn axiomatic::NeuralPolicy> = if is_bool || is_matrix || is_group || is_category || is_transforms || is_info || is_order || is_calculus || is_multivar || is_prob || is_topology || is_exterior || is_combinatorics || is_control {
+    let policy: Box<dyn axiomatic::NeuralPolicy> = if is_symbolic {
         Box::new(SymbolicNeuralPolicy::new())
     } else {
         if epochs > 0 {
@@ -457,7 +492,6 @@ fn run_autonomous_proof_cli(custom_conjecture: Option<&str>, induction_var: Opti
     };
 
     let initial_state = ProofState::new(target_eq.clone());
-    let max_children = if is_calculus || is_multivar || is_prob || is_info || is_group || is_transforms || is_category || is_topology || is_exterior || is_combinatorics || is_control { 12 } else { 8 };
     let mut mcts = MctsEngine::new(initial_state, max_children);
 
     let start = std::time::Instant::now();
@@ -737,51 +771,42 @@ fn run_export_trace_cli(
     emit_html: bool,
     max_iterations: usize,
     theorem_name: &str,
+    domain_arg: Option<&str>,
 ) {
     print_banner();
     println!("[INFO] Exporting Static Proof Trace & Showcase");
     println!("================================================================================");
 
-    let (target_eq, is_bool) = if let Some(conjecture_str) = custom_conjecture {
+    let target_eq = if let Some(conjecture_str) = custom_conjecture {
         match parse_conjecture(conjecture_str) {
             Ok(eq) => {
                 println!("[INPUT] Parsed target conjecture: {}", eq);
-                let is_b = axiomatic::is_boolean_equality(&eq);
-                (eq, is_b)
+                eq
             }
             Err(e) => {
                 println!(
                     "[WARN] Failed to parse input '{}': {}. Using default conjecture.",
                     conjecture_str, e
                 );
-                (default_target_conjecture(), false)
+                default_target_conjecture()
             }
         }
     } else {
-        (default_target_conjecture(), false)
+        default_target_conjecture()
     };
 
-    let domain_name = if is_bool {
-        "Propositional Boolean Logic"
-    } else {
-        "Abstract Algebra"
-    };
-
-    let axioms = if is_bool {
-        AxiomLibrary::boolean_logic()
-    } else {
-        AxiomLibrary::standard_algebra()
-    };
+    let (axioms, domain_name, max_children, _) = resolve_domain_and_axioms(&target_eq, domain_arg);
+    println!("[DOMAIN] Selected Domain: {}", domain_name);
 
     let policy = SymbolicNeuralPolicy::new();
     let root_state = ProofState::new(target_eq.clone());
-    let mut mcts = MctsEngine::new(root_state, 8);
+    let mut mcts = MctsEngine::new(root_state, max_children);
 
     println!(
         "[SEARCH] Running MCTS with budget of {} iterations...",
         max_iterations
     );
-    let _ = mcts.run_search(&policy, &axioms, max_iterations);
+    let _ = mcts.run_search_full(&policy, &axioms, max_iterations);
     let snapshot = mcts.snapshot();
 
     println!(

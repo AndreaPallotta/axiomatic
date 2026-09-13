@@ -253,6 +253,26 @@ impl MctsEngine {
         }
     }
 
+    /// Runs MCTS for the full iteration budget, continuing exploration even after a proof is found
+    pub fn run_search_full(
+        &mut self,
+        policy: &dyn NeuralPolicy,
+        axioms: &AxiomLibrary,
+        iterations: usize,
+    ) -> Option<ProofState> {
+        for _ in 0..iterations {
+            self.step(policy, axioms);
+        }
+
+        if let Some(proven_id) = self.proven_node_id {
+            let mut state = self.nodes[proven_id].state.clone();
+            state.minimize(axioms);
+            Some(state)
+        } else {
+            None
+        }
+    }
+
     /// Runs MCTS with dynamic premise retrieval from the Vector DB and Lemma Database
     pub fn run_search_with_premises(
         &mut self,
