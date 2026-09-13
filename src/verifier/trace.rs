@@ -584,13 +584,92 @@ fn generate_html_showcase(json_data: &str, trace: &StaticProofTrace) -> String {
         const nodeMap = new Map();
         nodes.forEach(n => nodeMap.set(n.id, n));
 
+        const primaryPathSet = new Set(trace.proof_path_node_ids || []);
+        const primaryEdges = new Set();
+        for (let i = 0; i < (trace.proof_path_node_ids || []).length - 1; i++) {{
+            primaryEdges.add(`${{trace.proof_path_node_ids[i]}}->${{trace.proof_path_node_ids[i + 1]}}`);
+        }}
+
+        const allProvenPathNodes = new Set();
+        const allProvenEdges = new Set();
+        nodes.forEach(n => {{
+            if (n.is_proven) {{
+                let curr = n.id;
+                while (curr !== null && curr !== undefined && nodeMap.has(curr)) {{
+                    allProvenPathNodes.add(curr);
+                    const pId = nodeMap.get(curr).parent_id;
+                    if (pId !== null && pId !== undefined) {{
+                        allProvenEdges.add(`${{pId}}->${{curr}}`);
+                    }}
+                    curr = pId;
+                }}
+            }}
+        }});
+
+        const selectedPathNodes = new Set();
+        const selectedPathEdges = new Set();
+
+        function termToString(term) {{
+            if (!term) return '';
+            if (typeof term === 'string') return term;
+            if (typeof term === 'number') return String(term);
+            if (term.Var !== undefined) return term.Var;
+            if (term.Const !== undefined) return term.Const;
+            if (term.Func !== undefined) {{
+                const name = term.Func[0];
+                const args = term.Func[1] || [];
+                if (args.length === 1 && (name === '-' || name === '!')) {{
+                    return `${{name}}${{termToString(args[0])}}`;
+                }}
+                const binaryOps = new Set(['+', '*', '·', '-', '/', '^', '&', '|', '<=', '<', '>=', '>', '=']);
+                if (args.length === 2 && binaryOps.has(name)) {{
+                    return `(${{termToString(args[0])}} ${{name}} ${{termToString(args[1])}})`;
+                }}
+                return `${{name}}(${{args.map(termToString).join(', ')}})`;
+            }}
+            return JSON.stringify(term);
+        }}
+
+        function equalityToString(eq) {{
+            if (!eq) return '';
+            if (typeof eq === 'string') return eq;
+            if (eq.lhs !== undefined && eq.rhs !== undefined) {{
+                return `${{termToString(eq.lhs)}} = ${{termToString(eq.rhs)}}`;
+            }}
+            return JSON.stringify(eq);
+        }}
+
+        function goalToString(g) {{
+            if (!g) return '';
+            if (g.equality) return equalityToString(g.equality);
+            return equalityToString(g);
+        }}
+
+        function formatTacticShort(tactic) {{
+            if (!tactic) return '';
+            if (typeof tactic === 'string') {{
+                if (tactic === 'Symmetry') return 'symm';
+                if (tactic === 'Reflexivity') return 'rfl';
+                if (tactic === 'EvalArithmeticLhs') return 'eval_lhs';
+                if (tactic === 'EvalArithmeticRhs') return 'eval_rhs';
+                if (tactic === 'TransposeToZero') return 'trans_zero';
+                if (tactic === 'ZeroProductSplit') return 'split_zero';
+                return tactic;
+            }}
+            if (tactic.RewriteLhs) return `rw [${{tactic.RewriteLhs}}]`;
+            if (tactic.RewriteRhs) return `rw [${{tactic.RewriteRhs}}] (R)`;
+            if (tactic.ApplyAxiom) return `apply ${{tactic.ApplyAxiom}}`;
+            if (tactic.Transitivity) return `trans (${{termToString(tactic.Transitivity)}})`;
+            return JSON.stringify(tactic);
+        }}
+
         function computeTreeLayout() {{
             nodes.forEach(n => {{
                 if (n.children_ids && n.children_ids.length > 0) {{
                     n.children_ids.sort((a, b) => {{
-                        const isProvenA = provenPathSet.has(a) ? 1 : 0;
-                        const isProvenB = provenPathSet.has(b) ? 1 : 0;
-                        if (isProvenA !== isProvenB) return isProvenB - isProvenA;
+                        const rankA = primaryPathSet.has(a) ? 2 : (allProvenPathNodes.has(a) ? 1 : 0);
+                        const rankB = primaryPathSet.has(b) ? 2 : (allProvenPathNodes.has(b) ? 1 : 0);
+                        if (rankA !== rankB) return rankB - rankA;
                         const nodeA = nodeMap.get(a);
                         const nodeB = nodeMap.get(b);
                         const vA = nodeA ? nodeA.visit_count : 0;
@@ -658,9 +737,13 @@ fn generate_html_showcase(json_data: &str, trace: &StaticProofTrace) -> String {
             nodes.forEach(node => {{
                 if (node.parent_id !== null && nodeMap.has(node.parent_id)) {{
                     const parent = nodeMap.get(node.parent_id);
-                    const isProvenEdge = provenPathSet.has(node.id) && provenPathSet.has(parent.id);
+                    const edgeKey = `${{parent.id}}->${{node.id}}`;
+                    const isPrimaryEdge = primaryEdges.has(edgeKey);
+                    const isProvenBranch = allProvenEdges.has(edgeKey);
+                    const isSelectedEdge = selectedPathEdges.has(edgeKey);
+                    const isHighlightedEdge = isPrimaryEdge || isProvenBranch || isSelectedEdge;
 
-                    if (!isProvenEdge) {{
+                    if (!isHighlightedEdge) {{
                         if ((parent.x < viewLeft && node.x < viewLeft) ||
                             (parent.x > viewRight && node.x > viewRight) ||
                             (parent.y < viewTop && node.y < viewTop) ||
@@ -670,18 +753,28 @@ fn generate_html_showcase(json_data: &str, trace: &StaticProofTrace) -> String {
                     }}
 
                     ctx.beginPath();
-                    ctx.strokeStyle = isProvenEdge ? '#3fb950' : '#30363d';
-                    ctx.lineWidth = isProvenEdge ? 3.0 : 1.5;
+                    if (isSelectedEdge) {{
+                        const isSelectedProven = (nodeMap.get(selectedNodeId) && nodeMap.get(selectedNodeId).is_proven) || allProvenPathNodes.has(selectedNodeId);
+                        ctx.strokeStyle = isSelectedProven ? '#3fb950' : '#58a6ff';
+                        ctx.lineWidth = 3.5;
+                    }} else if (isPrimaryEdge) {{
+                        ctx.strokeStyle = '#3fb950';
+                        ctx.lineWidth = 3.2;
+                    }} else if (isProvenBranch) {{
+                        ctx.strokeStyle = '#238636';
+                        ctx.lineWidth = 2.4;
+                    }} else {{
+                        ctx.strokeStyle = '#30363d';
+                        ctx.lineWidth = 1.2;
+                    }}
 
                     const midX = (parent.x + node.x) / 2;
                     ctx.moveTo(parent.x, parent.y);
                     ctx.bezierCurveTo(midX, parent.y, midX, node.y, node.x, node.y);
                     ctx.stroke();
 
-                    if (node.applied_tactic && (isProvenEdge || isPointInView(midX, (parent.y + node.y) / 2))) {{
-                        const tacticStr = typeof node.applied_tactic === 'string'
-                            ? node.applied_tactic
-                            : (node.applied_tactic.RewriteLhs ? `rw [${{node.applied_tactic.RewriteLhs}}]` : (node.applied_tactic.RewriteRhs ? `nth_rw [${{node.applied_tactic.RewriteRhs}}]` : JSON.stringify(node.applied_tactic)));
+                    if (node.applied_tactic && (isHighlightedEdge || isPointInView(midX, (parent.y + node.y) / 2))) {{
+                        const tacticStr = formatTacticShort(node.applied_tactic);
 
                         const labelX = (parent.x + node.x) / 2;
                         const labelY = (parent.y + node.y) / 2 - 8;
@@ -689,13 +782,33 @@ fn generate_html_showcase(json_data: &str, trace: &StaticProofTrace) -> String {
                         ctx.font = '500 10px "SFMono-Regular", Consolas, monospace';
                         const textWidth = ctx.measureText(tacticStr).width;
 
-                        ctx.fillStyle = isProvenEdge ? '#112211' : '#161b22';
+                        let fillStyle, strokeStyle, textColor;
+                        if (isSelectedEdge) {{
+                            const isSelectedProven = (nodeMap.get(selectedNodeId) && nodeMap.get(selectedNodeId).is_proven) || allProvenPathNodes.has(selectedNodeId);
+                            fillStyle = isSelectedProven ? '#112211' : '#041527';
+                            strokeStyle = isSelectedProven ? '#2ea043' : '#1f6feb';
+                            textColor = isSelectedProven ? '#3fb950' : '#58a6ff';
+                        }} else if (isPrimaryEdge) {{
+                            fillStyle = '#112211';
+                            strokeStyle = '#2ea043';
+                            textColor = '#3fb950';
+                        }} else if (isProvenBranch) {{
+                            fillStyle = '#0d1f12';
+                            strokeStyle = '#1b4724';
+                            textColor = '#2ea043';
+                        }} else {{
+                            fillStyle = '#161b22';
+                            strokeStyle = '#30363d';
+                            textColor = '#8b949e';
+                        }}
+
+                        ctx.fillStyle = fillStyle;
                         ctx.fillRect(labelX - textWidth / 2 - 4, labelY - 7, textWidth + 8, 14);
-                        ctx.strokeStyle = isProvenEdge ? '#2ea043' : '#30363d';
+                        ctx.strokeStyle = strokeStyle;
                         ctx.lineWidth = 1;
                         ctx.strokeRect(labelX - textWidth / 2 - 4, labelY - 7, textWidth + 8, 14);
 
-                        ctx.fillStyle = isProvenEdge ? '#3fb950' : '#8b949e';
+                        ctx.fillStyle = textColor;
                         ctx.textAlign = 'center';
                         ctx.textBaseline = 'middle';
                         ctx.fillText(tacticStr, labelX, labelY);
@@ -705,25 +818,39 @@ fn generate_html_showcase(json_data: &str, trace: &StaticProofTrace) -> String {
 
             nodes.forEach(node => {{
                 const radius = Math.min(22, Math.max(14, 14 + Math.log2(node.visit_count + 1) * 2.2));
-                const isProven = node.is_proven || provenPathSet.has(node.id);
+                const isSelected = node.id === selectedNodeId;
+                const isOnSelectedPath = selectedPathNodes.has(node.id);
+                const isProvenTerminal = node.is_proven;
+                const isPrimaryPath = primaryPathSet.has(node.id);
+                const isProvenPath = allProvenPathNodes.has(node.id);
 
-                if (!isProven && !isPointInView(node.x, node.y, radius + 10)) {{
+                if (!isProvenTerminal && !isProvenPath && !isSelected && !isOnSelectedPath && !isPointInView(node.x, node.y, radius + 10)) {{
                     return;
                 }}
 
                 ctx.beginPath();
                 ctx.arc(node.x, node.y, radius, 0, 2 * Math.PI);
 
-                const isSelected = node.id === selectedNodeId;
-
-                if (isProven) {{
+                if (isSelected) {{
+                    ctx.fillStyle = isProvenTerminal ? '#2ea043' : (isProvenPath ? '#1b4724' : '#1f6feb');
+                    ctx.strokeStyle = isProvenTerminal ? '#56d364' : (isProvenPath ? '#3fb950' : '#79c0ff');
+                    ctx.lineWidth = 3.5;
+                }} else if (isProvenTerminal) {{
                     ctx.fillStyle = '#238636';
                     ctx.strokeStyle = '#3fb950';
-                    ctx.lineWidth = 2.5;
-                }} else if (isSelected) {{
-                    ctx.fillStyle = '#1f6feb';
+                    ctx.lineWidth = 3.0;
+                }} else if (isPrimaryPath) {{
+                    ctx.fillStyle = '#1b4724';
+                    ctx.strokeStyle = '#3fb950';
+                    ctx.lineWidth = 2.2;
+                }} else if (isProvenPath) {{
+                    ctx.fillStyle = '#122f19';
+                    ctx.strokeStyle = '#2ea043';
+                    ctx.lineWidth = 1.8;
+                }} else if (isOnSelectedPath) {{
+                    ctx.fillStyle = '#0d2d6b';
                     ctx.strokeStyle = '#58a6ff';
-                    ctx.lineWidth = 2.5;
+                    ctx.lineWidth = 2.0;
                 }} else if (node.id === 0) {{
                     ctx.fillStyle = '#9e6a03';
                     ctx.strokeStyle = '#d29922';
@@ -747,14 +874,52 @@ fn generate_html_showcase(json_data: &str, trace: &StaticProofTrace) -> String {
             ctx.restore();
         }}
 
-        function updateInspector(node) {{
+        function selectNode(nodeId) {{
+            const node = nodeMap.get(nodeId);
+            if (!node) return;
+            selectedNodeId = nodeId;
+
+            selectedPathNodes.clear();
+            selectedPathEdges.clear();
+            let curr = nodeId;
+            const pathList = [];
+            while (curr !== null && curr !== undefined && nodeMap.has(curr)) {{
+                selectedPathNodes.add(curr);
+                pathList.push(curr);
+                const pId = nodeMap.get(curr).parent_id;
+                if (pId !== null && pId !== undefined) {{
+                    selectedPathEdges.add(`${{pId}}->${{curr}}`);
+                }}
+                curr = pId;
+            }}
+            pathList.reverse();
+
+            updateInspector(node, pathList);
+            updateTacticsSidebar(node);
+            render();
+        }}
+
+        function updateInspector(node, pathList = []) {{
             if (!node) return;
             const container = document.getElementById('selectedNodeDetails');
             const state = node.state || {{}};
             const openGoals = state.open_goals || [];
             const goalsHtml = openGoals.length === 0
                 ? '<span style="color:var(--accent-success); font-weight:600;">Reflexivity / All Goals Solved</span>'
-                : openGoals.map(g => `<code style="color:#58a6ff;">${{g.equality ? `${{g.equality.lhs}} = ${{g.equality.rhs}}` : JSON.stringify(g)}}</code>`).join('<br>');
+                : openGoals.map(g => `<code style="color:#58a6ff; display:block; margin:2px 0; word-break:break-all;">${{goalToString(g)}}</code>`).join('');
+
+            const inboundTactic = node.applied_tactic
+                ? formatTacticShort(node.applied_tactic)
+                : 'Root (Conjecture)';
+
+            const isProvenNode = node.is_proven;
+            const isProvenBranch = allProvenPathNodes.has(node.id);
+            const statusColor = isProvenNode
+                ? 'var(--accent-success)'
+                : (isProvenBranch ? '#3fb950' : (node.is_terminal ? '#f85149' : 'var(--text-secondary)'));
+            const statusText = isProvenNode
+                ? 'Proven (Q.E.D.)'
+                : (isProvenBranch ? 'On Proven Branch' : (node.is_terminal ? 'Dead End (Terminal)' : 'Active Open State'));
 
             container.innerHTML = `
                 <div class="stat-grid" style="margin-bottom:12px;">
@@ -780,29 +945,58 @@ fn generate_html_showcase(json_data: &str, trace: &StaticProofTrace) -> String {
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Status</span>
-                        <span class="stat-value" style="color:${{node.is_proven ? 'var(--accent-success)' : 'var(--text-secondary)'}};">
-                            ${{node.is_proven ? 'Proven' : (node.is_terminal ? 'Terminal' : 'Open')}}
+                        <span class="stat-value" style="color:${{statusColor}}; font-weight:600;">
+                            ${{statusText}}
                         </span>
                     </div>
                 </div>
-                <div style="font-size:11px; color:var(--text-secondary); margin-bottom:4px;">Open Goals:</div>
-                <div style="background:#090d13; padding:8px; border-radius:6px; font-size:12px; font-family:var(--font-code);">${{goalsHtml}}</div>
+                <div style="font-size:11px; color:var(--text-secondary); margin-bottom:4px; display:flex; justify-content:space-between;">
+                    <span>Open Goals (${{openGoals.length}}):</span>
+                    <span style="color:#8b949e;">Inbound: <code>${{inboundTactic}}</code></span>
+                </div>
+                <div style="background:#090d13; padding:10px; border-radius:6px; font-size:12px; font-family:var(--font-code); border:1px solid #30363d; max-height:160px; overflow-y:auto;">${{goalsHtml}}</div>
+                ${{pathList.length > 1 ? `
+                <div style="margin-top:10px; font-size:11px; color:var(--text-secondary);">
+                    Path from Root: <span style="color:#c9d1d9;">${{pathList.join(' &rarr; ')}}</span>
+                </div>` : ''}}
             `;
         }}
 
-        function focusProvenPath() {{
-            if (!trace.proof_path_node_ids || trace.proof_path_node_ids.length === 0) {{
-                panX = 80;
-                panY = canvas.height / 2;
-                zoom = 1.0;
-                render();
+        function updateTacticsSidebar(node) {{
+            const list = document.getElementById('tacticsList');
+            if (!list) return;
+            list.innerHTML = '';
+
+            const history = (node && node.state && node.state.proof_history && node.state.proof_history.length > 0)
+                ? node.state.proof_history.map(h => h[1])
+                : (trace.tactics_sequence || []);
+
+            if (history.length === 0) {{
+                list.innerHTML = '<li style="color:var(--text-secondary); font-size:12px;">No proof steps found</li>';
                 return;
             }}
 
-            const pathNodes = trace.proof_path_node_ids
-                .map(id => nodeMap.get(id))
-                .filter(Boolean);
+            history.forEach((stepStr, idx) => {{
+                const li = document.createElement('li');
+                li.className = 'path-item';
+                li.textContent = `${{idx + 1}}. ${{stepStr}}`;
+                list.appendChild(li);
+            }});
+        }}
 
+        function focusProvenPath() {{
+            let targetNodeId = (selectedNodeId !== null && nodeMap.has(selectedNodeId) && nodeMap.get(selectedNodeId).is_proven)
+                ? selectedNodeId
+                : (trace.proven_node_id !== null ? trace.proven_node_id : 0);
+
+            const pathNodeIds = [];
+            let curr = targetNodeId;
+            while (curr !== null && curr !== undefined && nodeMap.has(curr)) {{
+                pathNodeIds.push(curr);
+                curr = nodeMap.get(curr).parent_id;
+            }}
+
+            const pathNodes = pathNodeIds.map(id => nodeMap.get(id)).filter(Boolean);
             if (pathNodes.length === 0) return;
 
             let minX = Infinity, maxX = -Infinity;
@@ -829,12 +1023,7 @@ fn generate_html_showcase(json_data: &str, trace: &StaticProofTrace) -> String {
             panX = canvas.width / 2 - centerX * zoom;
             panY = canvas.height / 2 - centerY * zoom;
 
-            const targetNode = trace.proven_node_id !== null ? nodeMap.get(trace.proven_node_id) : pathNodes[0];
-            if (targetNode) {{
-                selectedNodeId = targetNode.id;
-                updateInspector(targetNode);
-            }}
-            render();
+            selectNode(targetNodeId);
         }}
 
         canvas.addEventListener('mousedown', e => {{
@@ -878,9 +1067,7 @@ fn generate_html_showcase(json_data: &str, trace: &StaticProofTrace) -> String {
             }});
 
             if (closest) {{
-                selectedNodeId = closest.id;
-                updateInspector(closest);
-                render();
+                selectNode(closest.id);
             }}
         }});
 
@@ -999,6 +1186,20 @@ mod tests {
         assert!(html_str.contains("test_theorem"));
 
         let _ = fs::remove_dir_all(&temp_dir);
+        Ok(())
+    }
+
+    #[test]
+    fn test_update_showcase_html() -> Result<(), Box<dyn std::error::Error>> {
+        for dir in &["showcase", "showcase/calculus", "showcase/algebra", "showcase/bool"] {
+            let json_p = format!("{}/trace.json", dir);
+            let html_p = format!("{}/index.html", dir);
+            if Path::new(&json_p).exists() {
+                let json_data = fs::read_to_string(&json_p)?;
+                let trace: StaticProofTrace = serde_json::from_str(&json_data)?;
+                TraceExporter::export_standalone_html(&trace, Path::new(&html_p))?;
+            }
+        }
         Ok(())
     }
 }
