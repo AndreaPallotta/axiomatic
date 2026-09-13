@@ -106,6 +106,10 @@ pub enum MathDomain {
     OrderTheory,
     MultivariableCalculus,
     Probability,
+    InformationTheory,
+    GroupTheory,
+    IntegralTransforms,
+    CategoryTheory,
     Unified,
 }
 
@@ -121,6 +125,10 @@ impl MathDomain {
             MathDomain::OrderTheory => "Order Theory",
             MathDomain::MultivariableCalculus => "Multivariable Calculus",
             MathDomain::Probability => "Probability Theory",
+            MathDomain::InformationTheory => "Information Theory & Entropy",
+            MathDomain::GroupTheory => "Abstract Group Theory",
+            MathDomain::IntegralTransforms => "Integral Transforms",
+            MathDomain::CategoryTheory => "Category Theory",
             MathDomain::Unified => "Unified Multidomain",
         }
     }
@@ -148,6 +156,10 @@ impl AxiomLibrary {
             MathDomain::OrderTheory => Self::order_theory(),
             MathDomain::MultivariableCalculus => Self::multivariable_calculus(),
             MathDomain::Probability => Self::probability(),
+            MathDomain::InformationTheory => Self::information_theory(),
+            MathDomain::GroupTheory => Self::group_theory(),
+            MathDomain::IntegralTransforms => Self::integral_transforms(),
+            MathDomain::CategoryTheory => Self::category_theory(),
             MathDomain::Unified => Self::unified_multidomain(),
         }
     }
@@ -1439,6 +1451,525 @@ impl AxiomLibrary {
         lib
     }
 
+    /// Axiomatic Information Theory & Shannon Entropy
+    pub fn information_theory() -> Self {
+        let mut lib = Self::empty();
+        let x = Term::var("X");
+        let y = Term::var("Y");
+        let p = Term::var("P");
+        let q = Term::var("Q");
+        let zero = Term::constant("0");
+        let true_val = Term::constant("true");
+
+        lib.add_rule(
+            "entropy_nonneg",
+            Equality::new(
+                Term::func("<=", vec![zero.clone(), Term::func("H", vec![x.clone()])]),
+                true_val.clone(),
+            ),
+        );
+
+        lib.add_rule(
+            "joint_entropy_chain",
+            Equality::new(
+                Term::func("H", vec![Term::func("joint", vec![x.clone(), y.clone()])]),
+                Term::func("+", vec![
+                    Term::func("H", vec![y.clone()]),
+                    Term::func("cond_H", vec![x.clone(), y.clone()]),
+                ]),
+            ),
+        );
+        lib.add_rule(
+            "joint_entropy_chain_rev",
+            Equality::new(
+                Term::func("+", vec![
+                    Term::func("H", vec![y.clone()]),
+                    Term::func("cond_H", vec![x.clone(), y.clone()]),
+                ]),
+                Term::func("H", vec![Term::func("joint", vec![x.clone(), y.clone()])]),
+            ),
+        );
+
+        lib.add_rule(
+            "joint_entropy_symm",
+            Equality::new(
+                Term::func("H", vec![Term::func("joint", vec![x.clone(), y.clone()])]),
+                Term::func("H", vec![Term::func("joint", vec![y.clone(), x.clone()])]),
+            ),
+        );
+
+        lib.add_rule(
+            "mi_def_x",
+            Equality::new(
+                Term::func("MI", vec![x.clone(), y.clone()]),
+                Term::func("+", vec![
+                    Term::func("H", vec![x.clone()]),
+                    Term::func("-", vec![Term::func("cond_H", vec![x.clone(), y.clone()])]),
+                ]),
+            ),
+        );
+        lib.add_rule(
+            "mi_def_x_rev",
+            Equality::new(
+                Term::func("+", vec![
+                    Term::func("H", vec![x.clone()]),
+                    Term::func("-", vec![Term::func("cond_H", vec![x.clone(), y.clone()])]),
+                ]),
+                Term::func("MI", vec![x.clone(), y.clone()]),
+            ),
+        );
+
+        lib.add_rule(
+            "mi_def_y",
+            Equality::new(
+                Term::func("MI", vec![x.clone(), y.clone()]),
+                Term::func("+", vec![
+                    Term::func("H", vec![y.clone()]),
+                    Term::func("-", vec![Term::func("cond_H", vec![y.clone(), x.clone()])]),
+                ]),
+            ),
+        );
+
+        lib.add_rule(
+            "mi_symm",
+            Equality::new(
+                Term::func("MI", vec![x.clone(), y.clone()]),
+                Term::func("MI", vec![y.clone(), x.clone()]),
+            ),
+        );
+
+        lib.add_rule(
+            "mi_joint",
+            Equality::new(
+                Term::func("MI", vec![x.clone(), y.clone()]),
+                Term::func("+", vec![
+                    Term::func("+", vec![
+                        Term::func("H", vec![x.clone()]),
+                        Term::func("H", vec![y.clone()]),
+                    ]),
+                    Term::func("-", vec![Term::func("H", vec![Term::func("joint", vec![x.clone(), y.clone()])])]),
+                ]),
+            ),
+        );
+
+        lib.add_rule(
+            "mi_self",
+            Equality::new(
+                Term::func("MI", vec![x.clone(), x.clone()]),
+                Term::func("H", vec![x.clone()]),
+            ),
+        );
+
+        lib.add_rule(
+            "conditioning_reduces_entropy",
+            Equality::new(
+                Term::func("<=", vec![
+                    Term::func("cond_H", vec![x.clone(), y.clone()]),
+                    Term::func("H", vec![x.clone()]),
+                ]),
+                true_val.clone(),
+            ),
+        );
+
+        lib.add_rule(
+            "mi_nonneg",
+            Equality::new(
+                Term::func("<=", vec![zero.clone(), Term::func("MI", vec![x.clone(), y.clone()])]),
+                true_val.clone(),
+            ),
+        );
+
+        lib.add_rule(
+            "kl_nonneg",
+            Equality::new(
+                Term::func("<=", vec![zero.clone(), Term::func("KL", vec![p.clone(), q.clone()])]),
+                true_val.clone(),
+            ),
+        );
+
+        lib.add_rule(
+            "kl_identity",
+            Equality::new(
+                Term::func("KL", vec![p.clone(), p.clone()]),
+                zero.clone(),
+            ),
+        );
+
+        lib
+    }
+
+    /// Abstract Group Theory & Homomorphisms
+    pub fn group_theory() -> Self {
+        let mut lib = Self::empty();
+        let x = Term::var("x");
+        let y = Term::var("y");
+        let z = Term::var("z");
+        let g = Term::var("g");
+        let h = Term::var("h");
+        let e = Term::constant("e");
+
+        lib.add_rule(
+            "group_id_left",
+            Equality::new(Term::func("*", vec![e.clone(), x.clone()]), x.clone()),
+        );
+        lib.add_rule(
+            "group_id_right",
+            Equality::new(Term::func("*", vec![x.clone(), e.clone()]), x.clone()),
+        );
+
+        lib.add_rule(
+            "group_inv_left",
+            Equality::new(
+                Term::func("*", vec![Term::func("inv", vec![x.clone()]), x.clone()]),
+                e.clone(),
+            ),
+        );
+        lib.add_rule(
+            "group_inv_right",
+            Equality::new(
+                Term::func("*", vec![x.clone(), Term::func("inv", vec![x.clone()])]),
+                e.clone(),
+            ),
+        );
+
+        lib.add_rule(
+            "group_assoc",
+            Equality::new(
+                Term::func("*", vec![Term::func("*", vec![x.clone(), y.clone()]), z.clone()]),
+                Term::func("*", vec![x.clone(), Term::func("*", vec![y.clone(), z.clone()])]),
+            ),
+        );
+
+        lib.add_rule(
+            "group_inv_mul",
+            Equality::new(
+                Term::func("inv", vec![Term::func("*", vec![x.clone(), y.clone()])]),
+                Term::func(
+                    "*",
+                    vec![
+                        Term::func("inv", vec![y.clone()]),
+                        Term::func("inv", vec![x.clone()]),
+                    ],
+                ),
+            ),
+        );
+
+        lib.add_rule(
+            "group_inv_inv",
+            Equality::new(
+                Term::func("inv", vec![Term::func("inv", vec![x.clone()])]),
+                x.clone(),
+            ),
+        );
+
+        lib.add_rule(
+            "group_inv_id",
+            Equality::new(Term::func("inv", vec![e.clone()]), e.clone()),
+        );
+
+        lib.add_rule(
+            "hom_mul",
+            Equality::new(
+                Term::func("phi", vec![Term::func("*", vec![x.clone(), y.clone()])]),
+                Term::func(
+                    "*",
+                    vec![
+                        Term::func("phi", vec![x.clone()]),
+                        Term::func("phi", vec![y.clone()]),
+                    ],
+                ),
+            ),
+        );
+        lib.add_rule(
+            "hom_id",
+            Equality::new(Term::func("phi", vec![e.clone()]), e.clone()),
+        );
+        lib.add_rule(
+            "hom_inv",
+            Equality::new(
+                Term::func("phi", vec![Term::func("inv", vec![x.clone()])]),
+                Term::func("inv", vec![Term::func("phi", vec![x.clone()])]),
+            ),
+        );
+
+        lib.add_rule(
+            "conj_def",
+            Equality::new(
+                Term::func("conj", vec![g.clone(), h.clone()]),
+                Term::func(
+                    "*",
+                    vec![
+                        Term::func("*", vec![g.clone(), h.clone()]),
+                        Term::func("inv", vec![g.clone()]),
+                    ],
+                ),
+            ),
+        );
+
+        lib.add_rule(
+            "hom_conj",
+            Equality::new(
+                Term::func("phi", vec![Term::func("conj", vec![g.clone(), h.clone()])]),
+                Term::func(
+                    "conj",
+                    vec![
+                        Term::func("phi", vec![g.clone()]),
+                        Term::func("phi", vec![h.clone()]),
+                    ],
+                ),
+            ),
+        );
+
+        lib
+    }
+
+    /// Integral Transforms: Fourier & Laplace
+    pub fn integral_transforms() -> Self {
+        let mut lib = Self::empty();
+        let f = Term::var("f");
+        let g = Term::var("g");
+        let c = Term::var("c");
+        let i = Term::constant("i");
+        let w = Term::constant("w");
+        let s = Term::constant("s");
+
+        lib.add_rule(
+            "fourier_add",
+            Equality::new(
+                Term::func("F", vec![Term::func("+", vec![f.clone(), g.clone()])]),
+                Term::func(
+                    "+",
+                    vec![
+                        Term::func("F", vec![f.clone()]),
+                        Term::func("F", vec![g.clone()]),
+                    ],
+                ),
+            ),
+        );
+        lib.add_rule(
+            "fourier_scale",
+            Equality::new(
+                Term::func("F", vec![Term::func("*", vec![c.clone(), f.clone()])]),
+                Term::func("*", vec![c.clone(), Term::func("F", vec![f.clone()])]),
+            ),
+        );
+
+        lib.add_rule(
+            "fourier_conv",
+            Equality::new(
+                Term::func("F", vec![Term::func("conv", vec![f.clone(), g.clone()])]),
+                Term::func(
+                    "*",
+                    vec![
+                        Term::func("F", vec![f.clone()]),
+                        Term::func("F", vec![g.clone()]),
+                    ],
+                ),
+            ),
+        );
+
+        lib.add_rule(
+            "fourier_deriv",
+            Equality::new(
+                Term::func("F", vec![Term::func("D", vec![f.clone()])]),
+                Term::func(
+                    "*",
+                    vec![
+                        Term::func("*", vec![i.clone(), w.clone()]),
+                        Term::func("F", vec![f.clone()]),
+                    ],
+                ),
+            ),
+        );
+        lib.add_rule(
+            "fourier_deriv2",
+            Equality::new(
+                Term::func("F", vec![Term::func("D", vec![Term::func("D", vec![f.clone()])])]),
+                Term::func(
+                    "*",
+                    vec![
+                        Term::func("-", vec![Term::func("*", vec![w.clone(), w.clone()])]),
+                        Term::func("F", vec![f.clone()]),
+                    ],
+                ),
+            ),
+        );
+
+        lib.add_rule(
+            "laplace_add",
+            Equality::new(
+                Term::func("L", vec![Term::func("+", vec![f.clone(), g.clone()])]),
+                Term::func(
+                    "+",
+                    vec![
+                        Term::func("L", vec![f.clone()]),
+                        Term::func("L", vec![g.clone()]),
+                    ],
+                ),
+            ),
+        );
+        lib.add_rule(
+            "laplace_scale",
+            Equality::new(
+                Term::func("L", vec![Term::func("*", vec![c.clone(), f.clone()])]),
+                Term::func("*", vec![c.clone(), Term::func("L", vec![f.clone()])]),
+            ),
+        );
+
+        lib.add_rule(
+            "laplace_conv",
+            Equality::new(
+                Term::func("L", vec![Term::func("conv", vec![f.clone(), g.clone()])]),
+                Term::func(
+                    "*",
+                    vec![
+                        Term::func("L", vec![f.clone()]),
+                        Term::func("L", vec![g.clone()]),
+                    ],
+                ),
+            ),
+        );
+
+        lib.add_rule(
+            "laplace_deriv",
+            Equality::new(
+                Term::func("L", vec![Term::func("D", vec![f.clone()])]),
+                Term::func("*", vec![s.clone(), Term::func("L", vec![f.clone()])]),
+            ),
+        );
+        lib.add_rule(
+            "laplace_deriv2",
+            Equality::new(
+                Term::func("L", vec![Term::func("D", vec![Term::func("D", vec![f.clone()])])]),
+                Term::func(
+                    "*",
+                    vec![
+                        Term::func("*", vec![s.clone(), s.clone()]),
+                        Term::func("L", vec![f.clone()]),
+                    ],
+                ),
+            ),
+        );
+
+        lib.add_rule(
+            "conv_comm",
+            Equality::new(
+                Term::func("conv", vec![f.clone(), g.clone()]),
+                Term::func("conv", vec![g.clone(), f.clone()]),
+            ),
+        );
+
+        lib.add_rule(
+            "inv_fourier_fourier",
+            Equality::new(
+                Term::func("invF", vec![Term::func("F", vec![f.clone()])]),
+                f.clone(),
+            ),
+        );
+
+        lib
+    }
+
+    /// Category Theory & Functorial Rewriting
+    pub fn category_theory() -> Self {
+        let mut lib = Self::empty();
+        let f = Term::var("f");
+        let g = Term::var("g");
+        let h = Term::var("h");
+        let functor_f = Term::var("F");
+        let functor_g = Term::var("G");
+        let id_morph = Term::constant("id");
+        let eta = Term::constant("eta");
+        let mu = Term::constant("mu");
+
+        lib.add_rule(
+            "cat_id_left",
+            Equality::new(
+                Term::func("comp", vec![id_morph.clone(), f.clone()]),
+                f.clone(),
+            ),
+        );
+        lib.add_rule(
+            "cat_id_right",
+            Equality::new(
+                Term::func("comp", vec![f.clone(), id_morph.clone()]),
+                f.clone(),
+            ),
+        );
+
+        lib.add_rule(
+            "cat_comp_assoc",
+            Equality::new(
+                Term::func(
+                    "comp",
+                    vec![
+                        Term::func("comp", vec![h.clone(), g.clone()]),
+                        f.clone(),
+                    ],
+                ),
+                Term::func(
+                    "comp",
+                    vec![
+                        h.clone(),
+                        Term::func("comp", vec![g.clone(), f.clone()]),
+                    ],
+                ),
+            ),
+        );
+
+        lib.add_rule(
+            "functor_id",
+            Equality::new(
+                Term::func("Map", vec![functor_f.clone(), id_morph.clone()]),
+                id_morph.clone(),
+            ),
+        );
+
+        lib.add_rule(
+            "functor_comp",
+            Equality::new(
+                Term::func("Map", vec![functor_f.clone(), Term::func("comp", vec![g.clone(), f.clone()])]),
+                Term::func(
+                    "comp",
+                    vec![
+                        Term::func("Map", vec![functor_f.clone(), g.clone()]),
+                        Term::func("Map", vec![functor_f.clone(), f.clone()]),
+                    ],
+                ),
+            ),
+        );
+
+        lib.add_rule(
+            "naturality_square",
+            Equality::new(
+                Term::func(
+                    "comp",
+                    vec![
+                        eta.clone(),
+                        Term::func("Map", vec![functor_f.clone(), f.clone()]),
+                    ],
+                ),
+                Term::func(
+                    "comp",
+                    vec![
+                        Term::func("Map", vec![functor_g.clone(), f.clone()]),
+                        eta.clone(),
+                    ],
+                ),
+            ),
+        );
+
+        lib.add_rule(
+            "monad_unit_right",
+            Equality::new(
+                Term::func("comp", vec![mu.clone(), eta.clone()]),
+                id_morph.clone(),
+            ),
+        );
+
+        lib
+    }
+
     /// Unified Multi-Domain Library
     pub fn unified_multidomain() -> Self {
         let mut lib = Self::standard_algebra();
@@ -1478,6 +2009,26 @@ impl AxiomLibrary {
             }
         }
         for (name, rule) in Self::probability().rules {
+            if !lib.rules.iter().any(|(n, _)| n == &name) {
+                lib.add_rule(&name, rule);
+            }
+        }
+        for (name, rule) in Self::information_theory().rules {
+            if !lib.rules.iter().any(|(n, _)| n == &name) {
+                lib.add_rule(&name, rule);
+            }
+        }
+        for (name, rule) in Self::group_theory().rules {
+            if !lib.rules.iter().any(|(n, _)| n == &name) {
+                lib.add_rule(&name, rule);
+            }
+        }
+        for (name, rule) in Self::integral_transforms().rules {
+            if !lib.rules.iter().any(|(n, _)| n == &name) {
+                lib.add_rule(&name, rule);
+            }
+        }
+        for (name, rule) in Self::category_theory().rules {
             if !lib.rules.iter().any(|(n, _)| n == &name) {
                 lib.add_rule(&name, rule);
             }

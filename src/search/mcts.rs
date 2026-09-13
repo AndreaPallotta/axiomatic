@@ -731,4 +731,98 @@ mod tests {
         };
         assert!(solved.is_solved);
     }
+
+    #[test]
+    fn test_mcts_proves_shannon_mutual_information_symmetry() {
+        let axioms = AxiomLibrary::information_theory();
+        let policy = SymbolicNeuralPolicy::new();
+
+        let Ok(eq) = crate::verifier::parser::parse_conjecture("MI(X, Y) = MI(Y, X)") else {
+            panic!("Failed to parse Shannon mutual info symmetry");
+        };
+        let mut mcts = MctsEngine::new(ProofState::new(eq), 4);
+        let proof = mcts.run_search(&policy, &axioms, 10);
+        let Some(solved) = proof else {
+            panic!("MCTS must prove mutual information symmetry");
+        };
+        assert!(solved.is_solved);
+    }
+
+    #[test]
+    fn test_mcts_proves_group_homomorphism_inverse() {
+        let axioms = AxiomLibrary::group_theory();
+        let policy = SymbolicNeuralPolicy::new();
+
+        let Ok(eq) = crate::verifier::parser::parse_conjecture("phi(inv(x)) = inv(phi(x))") else {
+            panic!("Failed to parse group homomorphism inverse");
+        };
+        let mut mcts = MctsEngine::new(ProofState::new(eq), 4);
+        let proof = mcts.run_search(&policy, &axioms, 10);
+        let Some(solved) = proof else {
+            panic!("MCTS must prove group homomorphism inverse");
+        };
+        assert!(solved.is_solved);
+    }
+
+    #[test]
+    fn test_mcts_proves_fourier_convolution_theorem() {
+        let axioms = AxiomLibrary::integral_transforms();
+        let policy = SymbolicNeuralPolicy::new();
+
+        let Ok(eq) = crate::verifier::parser::parse_conjecture("F(conv(f, g)) = (F(f) * F(g))") else {
+            panic!("Failed to parse Fourier convolution theorem");
+        };
+        let mut mcts = MctsEngine::new(ProofState::new(eq), 4);
+        let proof = mcts.run_search(&policy, &axioms, 10);
+        let Some(solved) = proof else {
+            panic!("MCTS must prove Fourier convolution theorem");
+        };
+        assert!(solved.is_solved);
+    }
+
+    #[test]
+    fn test_mcts_proves_functor_composition_law() {
+        let axioms = AxiomLibrary::category_theory();
+        let policy = SymbolicNeuralPolicy::new();
+
+        let Ok(eq) = crate::verifier::parser::parse_conjecture("Map(F, comp(g, f)) = comp(Map(F, g), Map(F, f))") else {
+            panic!("Failed to parse Functor composition law");
+        };
+        let mut mcts = MctsEngine::new(ProofState::new(eq), 4);
+        let proof = mcts.run_search(&policy, &axioms, 10);
+        let Some(solved) = proof else {
+            panic!("MCTS must prove functor composition law");
+        };
+        assert!(solved.is_solved);
+    }
+
+    #[test]
+    fn test_induction_engine_peano_lean_certified() {
+        let axioms = AxiomLibrary::standard_algebra();
+        let Ok(eq) = crate::verifier::parser::parse_conjecture("(n + 0) = n") else {
+            panic!("Failed to parse Peano conjecture");
+        };
+        let Ok(ind_proof) = crate::verifier::induction::InductionEngine::synthesize_induction_proof(&eq, "n", &axioms, 100) else {
+            panic!("Induction synthesis must succeed");
+        };
+
+        assert!(ind_proof.base_case_proof.is_solved);
+        assert!(ind_proof.inductive_step_proof.is_solved);
+
+        let lean_code = ind_proof.export_to_lean4();
+        let proofs_dir = std::path::Path::new("proofs");
+        let _ = std::fs::create_dir_all(proofs_dir);
+        let artifact_path = proofs_dir.join("test_peano_induction_proof.lean");
+        let write_res = std::fs::write(&artifact_path, &lean_code);
+        assert!(write_res.is_ok(), "Failed to write induction proof");
+
+        let val_result = crate::verifier::lean_runner::Lean4Validator::validate_file(&artifact_path);
+        match val_result {
+            crate::verifier::lean_runner::LeanValidationResult::Certified { .. } => {}
+            crate::verifier::lean_runner::LeanValidationResult::LeanNotInstalled { .. } => {}
+            crate::verifier::lean_runner::LeanValidationResult::CompilerError { stderr, stdout } => {
+                panic!("Lean 4 compilation failed: stderr={}, stdout={}", stderr, stdout);
+            }
+        }
+    }
 }

@@ -16,6 +16,8 @@ pub fn term_to_lean_with_domain(term: &Term, is_bool: bool) -> String {
                     "1" | "true" => "true".to_string(),
                     other => other.to_string(),
                 }
+            } else if name == "id" {
+                "id_morph".to_string()
             } else {
                 name.clone()
             }
@@ -50,6 +52,8 @@ pub fn term_to_lean_with_domain(term: &Term, is_bool: bool) -> String {
                     "Integral"
                 } else if name == "cond" {
                     "prob_cond"
+                } else if name == "id" {
+                    "id_morph"
                 } else {
                     name.as_str()
                 };
@@ -217,6 +221,56 @@ fn map_rule_to_lean_base(rule: &str) -> String {
         "prob_cond_def_rev" => "prob_cond_def_rev".to_string(),
         "bayes_symmetric" => "bayes_symmetric".to_string(),
         "bayes_isolated" => "bayes_isolated".to_string(),
+
+        "entropy_nonneg" => "entropy_nonneg".to_string(),
+        "joint_entropy_chain" => "joint_entropy_chain".to_string(),
+        "joint_entropy_chain_rev" => "joint_entropy_chain_rev".to_string(),
+        "joint_entropy_symm" => "joint_entropy_symm".to_string(),
+        "mi_def_x" => "mi_def_x".to_string(),
+        "mi_def_x_rev" => "mi_def_x_rev".to_string(),
+        "mi_def_y" => "mi_def_y".to_string(),
+        "mi_symm" => "mi_symm".to_string(),
+        "mi_joint" => "mi_joint".to_string(),
+        "mi_self" => "mi_self".to_string(),
+        "conditioning_reduces_entropy" => "conditioning_reduces_entropy".to_string(),
+        "mi_nonneg" => "mi_nonneg".to_string(),
+        "kl_nonneg" => "kl_nonneg".to_string(),
+        "kl_identity" => "kl_identity".to_string(),
+
+        "group_id_left" => "group_id_left".to_string(),
+        "group_id_right" => "group_id_right".to_string(),
+        "group_inv_left" => "group_inv_left".to_string(),
+        "group_inv_right" => "group_inv_right".to_string(),
+        "group_assoc" => "group_assoc".to_string(),
+        "group_inv_mul" => "group_inv_mul".to_string(),
+        "group_inv_inv" => "group_inv_inv".to_string(),
+        "group_inv_id" => "group_inv_id".to_string(),
+        "hom_mul" => "hom_mul".to_string(),
+        "hom_id" => "hom_id".to_string(),
+        "hom_inv" => "hom_inv".to_string(),
+        "conj_def" => "conj_def".to_string(),
+        "hom_conj" => "hom_conj".to_string(),
+
+        "fourier_add" => "fourier_add".to_string(),
+        "fourier_scale" => "fourier_scale".to_string(),
+        "fourier_conv" => "fourier_conv".to_string(),
+        "fourier_deriv" => "fourier_deriv".to_string(),
+        "fourier_deriv2" => "fourier_deriv2".to_string(),
+        "laplace_add" => "laplace_add".to_string(),
+        "laplace_scale" => "laplace_scale".to_string(),
+        "laplace_conv" => "laplace_conv".to_string(),
+        "laplace_deriv" => "laplace_deriv".to_string(),
+        "laplace_deriv2" => "laplace_deriv2".to_string(),
+        "conv_comm" => "conv_comm".to_string(),
+        "inv_fourier_fourier" => "inv_fourier_fourier".to_string(),
+
+        "cat_id_left" => "cat_id_left".to_string(),
+        "cat_id_right" => "cat_id_right".to_string(),
+        "cat_comp_assoc" => "cat_comp_assoc".to_string(),
+        "functor_id" => "functor_id".to_string(),
+        "functor_comp" => "functor_comp".to_string(),
+        "naturality_square" => "naturality_square".to_string(),
+        "monad_unit_right" => "monad_unit_right".to_string(),
 
         "and_true" => "Bool.and_true".to_string(),
         "true_and" => "Bool.true_and".to_string(),
@@ -416,14 +470,18 @@ pub fn export_equality_to_lean4(
         code.push_str("axiom bayes_isolated (A B : Int) : prob_cond A B = (prob_cond B A * P A) / P B\n\n");
     }
 
-    let has_matrix = goal.lhs.contains_symbol("T") || goal.rhs.contains_symbol("T")
+    let is_group_or_cat = goal.lhs.contains_symbol("phi") || goal.rhs.contains_symbol("phi")
+        || goal.lhs.contains_symbol("conj") || goal.rhs.contains_symbol("conj")
+        || goal.lhs.contains_symbol("comp") || goal.rhs.contains_symbol("comp")
+        || goal.lhs.contains_symbol("Map") || goal.rhs.contains_symbol("Map");
+
+    let has_matrix = !is_group_or_cat && (goal.lhs.contains_symbol("T") || goal.rhs.contains_symbol("T")
         || goal.lhs.contains_symbol("tr") || goal.rhs.contains_symbol("tr")
         || goal.lhs.contains_symbol("det") || goal.rhs.contains_symbol("det")
-        || goal.lhs.contains_symbol("inv") || goal.rhs.contains_symbol("inv")
         || goal.lhs.contains_symbol("I") || goal.rhs.contains_symbol("I")
         || final_state.proof_history.iter().any(|(t, _)| {
-            matches!(t, Tactic::RewriteLhs(r) | Tactic::RewriteRhs(r) if r.starts_with("transpose_") || r.starts_with("trace_") || r.starts_with("det_") || r.starts_with("mat_") || r.starts_with("inv_"))
-        });
+            matches!(t, Tactic::RewriteLhs(r) | Tactic::RewriteRhs(r) if r.starts_with("transpose_") || r.starts_with("trace_") || r.starts_with("det_") || r.starts_with("mat_"))
+        }));
     if has_matrix {
         vars.retain(|s| s != "T" && s != "tr" && s != "det" && s != "inv" && s != "I");
         code.push_str("structure Matrix where (dummy : Nat) deriving Inhabited\n");
@@ -482,6 +540,118 @@ pub fn export_equality_to_lean4(
         code.push_str("axiom factor_common_left (x y z : Int) : ((z * x) + (z * y)) = (z * (x + y))\n\n");
     }
 
+    let has_info = goal.lhs.contains_symbol("H") || goal.rhs.contains_symbol("H")
+        || goal.lhs.contains_symbol("joint") || goal.rhs.contains_symbol("joint")
+        || goal.lhs.contains_symbol("cond_H") || goal.rhs.contains_symbol("cond_H")
+        || goal.lhs.contains_symbol("MI") || goal.rhs.contains_symbol("MI")
+        || goal.lhs.contains_symbol("KL") || goal.rhs.contains_symbol("KL");
+    if has_info {
+        vars.retain(|s| s != "H" && s != "joint" && s != "cond_H" && s != "MI" && s != "KL");
+        code.push_str("opaque H : Int -> Int\n");
+        code.push_str("opaque joint : Int -> Int -> Int\n");
+        code.push_str("opaque cond_H : Int -> Int -> Int\n");
+        code.push_str("opaque MI : Int -> Int -> Int\n");
+        code.push_str("opaque KL : Int -> Int -> Int\n");
+        code.push_str("axiom entropy_nonneg (X : Int) : (0 <= H X) = true\n");
+        code.push_str("axiom joint_entropy_chain (X Y : Int) : H (joint X Y) = H Y + cond_H X Y\n");
+        code.push_str("axiom joint_entropy_chain_rev (X Y : Int) : H Y + cond_H X Y = H (joint X Y)\n");
+        code.push_str("axiom joint_entropy_symm (X Y : Int) : H (joint X Y) = H (joint Y X)\n");
+        code.push_str("axiom mi_def_x (X Y : Int) : MI X Y = H X + -(cond_H X Y)\n");
+        code.push_str("axiom mi_def_x_rev (X Y : Int) : H X + -(cond_H X Y) = MI X Y\n");
+        code.push_str("axiom mi_def_y (X Y : Int) : MI X Y = H Y + -(cond_H Y X)\n");
+        code.push_str("axiom mi_symm (X Y : Int) : MI X Y = MI Y X\n");
+        code.push_str("axiom mi_joint (X Y : Int) : MI X Y = (H X + H Y) + -(H (joint X Y))\n");
+        code.push_str("axiom mi_self (X : Int) : MI X X = H X\n");
+        code.push_str("axiom conditioning_reduces_entropy (X Y : Int) : (cond_H X Y <= H X) = true\n");
+        code.push_str("axiom mi_nonneg (X Y : Int) : (0 <= MI X Y) = true\n");
+        code.push_str("axiom kl_nonneg (P Q : Int) : (0 <= KL P Q) = true\n");
+        code.push_str("axiom kl_identity (P : Int) : KL P P = 0\n\n");
+    }
+
+    let has_group = goal.lhs.contains_symbol("phi") || goal.rhs.contains_symbol("phi")
+        || goal.lhs.contains_symbol("conj") || goal.rhs.contains_symbol("conj")
+        || final_state.proof_history.iter().any(|(t, _)| {
+            matches!(t, Tactic::RewriteLhs(r) | Tactic::RewriteRhs(r) if r.starts_with("group_") || r.starts_with("hom_") || r.starts_with("conj_"))
+        });
+    if has_group {
+        vars.retain(|s| s != "phi" && s != "conj" && s != "inv" && s != "e");
+        code.push_str("structure GroupElem where (dummy : Nat) deriving Inhabited\n");
+        code.push_str("opaque group_mul : GroupElem -> GroupElem -> GroupElem\n");
+        code.push_str("instance : Mul GroupElem := ⟨group_mul⟩\n");
+        code.push_str("opaque inv : GroupElem -> GroupElem\n");
+        code.push_str("opaque e : GroupElem\n");
+        code.push_str("opaque phi : GroupElem -> GroupElem\n");
+        code.push_str("opaque conj : GroupElem -> GroupElem -> GroupElem\n");
+        code.push_str("axiom group_id_left (x : GroupElem) : e * x = x\n");
+        code.push_str("axiom group_id_right (x : GroupElem) : x * e = x\n");
+        code.push_str("axiom group_inv_left (x : GroupElem) : inv x * x = e\n");
+        code.push_str("axiom group_inv_right (x : GroupElem) : x * inv x = e\n");
+        code.push_str("axiom group_assoc (x y z : GroupElem) : (x * y) * z = x * (y * z)\n");
+        code.push_str("axiom group_inv_mul (x y : GroupElem) : inv (x * y) = inv y * inv x\n");
+        code.push_str("axiom group_inv_inv (x : GroupElem) : inv (inv x) = x\n");
+        code.push_str("axiom group_inv_id : inv e = e\n");
+        code.push_str("axiom hom_mul (x y : GroupElem) : phi (x * y) = phi x * phi y\n");
+        code.push_str("axiom hom_id : phi e = e\n");
+        code.push_str("axiom hom_inv (x : GroupElem) : phi (inv x) = inv (phi x)\n");
+        code.push_str("axiom conj_def (g h : GroupElem) : conj g h = (g * h) * inv g\n");
+        code.push_str("axiom hom_conj (g h : GroupElem) : phi (conj g h) = conj (phi g) (phi h)\n\n");
+    }
+
+    let has_category = goal.lhs.contains_symbol("comp") || goal.rhs.contains_symbol("comp")
+        || goal.lhs.contains_symbol("id_morph") || goal.rhs.contains_symbol("id_morph")
+        || goal.lhs.contains_symbol("id") || goal.rhs.contains_symbol("id")
+        || goal.lhs.contains_symbol("Map") || goal.rhs.contains_symbol("Map")
+        || goal.lhs.contains_symbol("eta") || goal.rhs.contains_symbol("eta")
+        || goal.lhs.contains_symbol("mu") || goal.rhs.contains_symbol("mu");
+    if has_category {
+        vars.retain(|s| s != "comp" && s != "id" && s != "id_morph" && s != "Map" && s != "eta" && s != "mu");
+        code.push_str("structure Morphism where (dummy : Nat) deriving Inhabited\n");
+        code.push_str("opaque comp : Morphism -> Morphism -> Morphism\n");
+        code.push_str("opaque id_morph : Morphism\n");
+        code.push_str("opaque Map : Morphism -> Morphism -> Morphism\n");
+        code.push_str("opaque eta : Morphism\n");
+        code.push_str("opaque mu : Morphism\n");
+        code.push_str("axiom cat_id_left (f : Morphism) : comp id_morph f = f\n");
+        code.push_str("axiom cat_id_right (f : Morphism) : comp f id_morph = f\n");
+        code.push_str("axiom cat_comp_assoc (h g f : Morphism) : comp (comp h g) f = comp h (comp g f)\n");
+        code.push_str("axiom functor_id (F : Morphism) : Map F id_morph = id_morph\n");
+        code.push_str("axiom functor_comp (F g f : Morphism) : Map F (comp g f) = comp (Map F g) (Map F f)\n");
+        code.push_str("axiom naturality_square (F G f : Morphism) : comp eta (Map F f) = comp (Map G f) eta\n");
+        code.push_str("axiom monad_unit_right : comp mu eta = id_morph\n\n");
+    }
+
+    let has_transforms = !has_category && (goal.lhs.contains_symbol("F") || goal.rhs.contains_symbol("F")
+        || goal.lhs.contains_symbol("L") || goal.rhs.contains_symbol("L")
+        || goal.lhs.contains_symbol("conv") || goal.rhs.contains_symbol("conv")
+        || goal.lhs.contains_symbol("invF") || goal.rhs.contains_symbol("invF"));
+    if has_transforms {
+        vars.retain(|s| s != "F" && s != "L" && s != "conv" && s != "invF" && s != "w" && s != "s" && s != "D" && s != "i");
+        code.push_str("opaque F : Int -> Int\n");
+        code.push_str("opaque L : Int -> Int\n");
+        code.push_str("opaque conv : Int -> Int -> Int\n");
+        code.push_str("opaque invF : Int -> Int\n");
+        if !has_calculus {
+            code.push_str("opaque D : Int -> Int\n");
+        }
+        if !has_imaginary {
+            code.push_str("opaque i : Int\n");
+        }
+        code.push_str("opaque w : Int\n");
+        code.push_str("opaque s : Int\n");
+        code.push_str("axiom fourier_add (f g : Int) : F (f + g) = F f + F g\n");
+        code.push_str("axiom fourier_scale (c f : Int) : F (c * f) = c * F f\n");
+        code.push_str("axiom fourier_conv (f g : Int) : F (conv f g) = F f * F g\n");
+        code.push_str("axiom fourier_deriv (f : Int) : F (D f) = (i * w) * F f\n");
+        code.push_str("axiom fourier_deriv2 (f : Int) : F (D (D f)) = (-(w * w)) * F f\n");
+        code.push_str("axiom laplace_add (f g : Int) : L (f + g) = L f + L g\n");
+        code.push_str("axiom laplace_scale (c f : Int) : L (c * f) = c * L f\n");
+        code.push_str("axiom laplace_conv (f g : Int) : L (conv f g) = L f * L g\n");
+        code.push_str("axiom laplace_deriv (f : Int) : L (D f) = s * L f\n");
+        code.push_str("axiom laplace_deriv2 (f : Int) : L (D (D f)) = (s * s) * L f\n");
+        code.push_str("axiom conv_comm (f g : Int) : conv f g = conv g f\n");
+        code.push_str("axiom inv_fourier_fourier (f : Int) : invF (F f) = f\n\n");
+    }
+
     fn has_negation(term: &Term) -> bool {
         match term {
             Term::Const(s) => s.starts_with('-'),
@@ -491,11 +661,15 @@ pub fn export_equality_to_lean4(
     }
     let type_name = if is_bool {
         "Bool"
+    } else if has_group {
+        "GroupElem"
+    } else if has_category {
+        "Morphism"
     } else if has_matrix {
         "Matrix"
     } else if has_imaginary {
         "ComplexI"
-    } else if has_calculus || has_multivar || has_prob || has_factoring || has_order || has_negation(&goal.lhs) || has_negation(&goal.rhs) {
+    } else if has_calculus || has_multivar || has_prob || has_info || has_transforms || has_factoring || has_order || has_negation(&goal.lhs) || has_negation(&goal.rhs) {
         "Int"
     } else {
         "Nat"

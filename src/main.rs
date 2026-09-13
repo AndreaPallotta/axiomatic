@@ -98,8 +98,19 @@ async fn main() {
             run_neural_network_training(target_secs, target_epochs, &dir);
         }
         "prove" | "search" => {
-            let custom = args.get(2).map(|s| s.as_str());
-            run_autonomous_proof_cli(custom);
+            let mut custom: Option<&str> = None;
+            let mut induction_var: Option<&str> = None;
+            let mut i = 2;
+            while i < args.len() {
+                if (args[i] == "--induction" || args[i] == "-i") && i + 1 < args.len() {
+                    induction_var = Some(&args[i + 1]);
+                    i += 1;
+                } else if custom.is_none() && !args[i].starts_with('-') {
+                    custom = Some(&args[i]);
+                }
+                i += 1;
+            }
+            run_autonomous_proof_cli(custom, induction_var);
         }
         "serve" | "ui" | "dashboard" => {
             let port = args.get(2).and_then(|p| p.parse().ok()).unwrap_or(3000);
@@ -223,7 +234,7 @@ fn default_target_conjecture() -> Equality {
 }
 
 /// Runs CLI proof discovery on algebraic goals
-fn run_autonomous_proof_cli(custom_conjecture: Option<&str>) {
+fn run_autonomous_proof_cli(custom_conjecture: Option<&str>, induction_var: Option<&str>) {
     print_banner();
     println!("[INFO] Initiating Neurosymbolic MCTS Proof Search");
     println!("================================================================================");
@@ -251,6 +262,26 @@ fn run_autonomous_proof_cli(custom_conjecture: Option<&str>) {
         || target_eq.lhs.contains_symbol("tr") || target_eq.rhs.contains_symbol("tr")
         || target_eq.lhs.contains_symbol("det") || target_eq.rhs.contains_symbol("det")
         || target_eq.lhs.contains_symbol("inv") || target_eq.rhs.contains_symbol("inv");
+
+    let is_group = target_eq.lhs.contains_symbol("phi") || target_eq.rhs.contains_symbol("phi")
+        || target_eq.lhs.contains_symbol("conj") || target_eq.rhs.contains_symbol("conj")
+        || (target_eq.lhs.contains_symbol("e") && target_eq.lhs.contains_symbol("inv"))
+        || (target_eq.rhs.contains_symbol("e") && target_eq.rhs.contains_symbol("inv"));
+
+    let is_category = target_eq.lhs.contains_symbol("comp") || target_eq.rhs.contains_symbol("comp")
+        || target_eq.lhs.contains_symbol("Map") || target_eq.rhs.contains_symbol("Map")
+        || target_eq.lhs.contains_symbol("eta") || target_eq.rhs.contains_symbol("eta")
+        || target_eq.lhs.contains_symbol("id") || target_eq.rhs.contains_symbol("id");
+
+    let is_transforms = target_eq.lhs.contains_symbol("F") || target_eq.rhs.contains_symbol("F")
+        || target_eq.lhs.contains_symbol("L") || target_eq.rhs.contains_symbol("L")
+        || target_eq.lhs.contains_symbol("conv") || target_eq.rhs.contains_symbol("conv")
+        || target_eq.lhs.contains_symbol("invF") || target_eq.rhs.contains_symbol("invF");
+
+    let is_info = target_eq.lhs.contains_symbol("H") || target_eq.rhs.contains_symbol("H")
+        || target_eq.lhs.contains_symbol("cond_H") || target_eq.rhs.contains_symbol("cond_H")
+        || target_eq.lhs.contains_symbol("MI") || target_eq.rhs.contains_symbol("MI")
+        || target_eq.lhs.contains_symbol("KL") || target_eq.rhs.contains_symbol("KL");
 
     let is_order = target_eq.lhs.contains_symbol("<=") || target_eq.rhs.contains_symbol("<=")
         || target_eq.lhs.contains_symbol("<") || target_eq.rhs.contains_symbol("<");
@@ -291,9 +322,21 @@ fn run_autonomous_proof_cli(custom_conjecture: Option<&str>) {
         return;
     }
 
-    let axioms = if is_matrix {
+    let axioms = if is_group {
+        println!("[DOMAIN] Detected Abstract Group Theory Domain");
+        AxiomLibrary::group_theory()
+    } else if is_matrix {
         println!("[DOMAIN] Detected Non-Commutative Linear Algebra Domain");
         AxiomLibrary::linear_algebra()
+    } else if is_category {
+        println!("[DOMAIN] Detected Category Theory & Functorial Rewriting Domain");
+        AxiomLibrary::category_theory()
+    } else if is_transforms {
+        println!("[DOMAIN] Detected Integral Transforms (Fourier & Laplace) Domain");
+        AxiomLibrary::integral_transforms()
+    } else if is_info {
+        println!("[DOMAIN] Detected Information Theory & Shannon Entropy Domain");
+        AxiomLibrary::information_theory()
     } else if is_order {
         println!("[DOMAIN] Detected Real Order Theory Domain");
         AxiomLibrary::order_theory()
@@ -313,8 +356,64 @@ fn run_autonomous_proof_cli(custom_conjecture: Option<&str>) {
         AxiomLibrary::unified_multidomain()
     };
 
+    if let Some(var) = induction_var {
+        println!("================================================================================");
+        println!("[INDUCTION] Initiating Induction Engine 2.0 on variable '{}'", var);
+        println!("  - Target: {}", target_eq);
+        let start_ind = std::time::Instant::now();
+        match axiomatic::InductionEngine::synthesize_induction_proof(&target_eq, var, &axioms, 250) {
+            Ok(ind_proof) => {
+                let elapsed_ind = start_ind.elapsed();
+                println!("[Q.E.D.] Autonomous Inductive Proof Synthesized Successfully!");
+                println!("  - Execution Time:  {:.3} ms", elapsed_ind.as_secs_f64() * 1000.0);
+                println!("  - Base Case ({} = 0): Solved in {} steps", var, ind_proof.base_case_proof.proof_history.len());
+                for (s, (t, d)) in ind_proof.base_case_proof.proof_history.iter().enumerate() {
+                    println!("      Step {}. [{}] -> {}", s + 1, t, d);
+                }
+                println!("  - Inductive Step ({} -> succ({})): Solved in {} steps", var, var, ind_proof.inductive_step_proof.proof_history.len());
+                for (s, (t, d)) in ind_proof.inductive_step_proof.proof_history.iter().enumerate() {
+                    println!("      Step {}. [{}] -> {}", s + 1, t, d);
+                }
+
+                let lean_code = ind_proof.export_to_lean4();
+                let proofs_dir = Path::new("proofs");
+                let _ = std::fs::create_dir_all(proofs_dir);
+                let artifact_path = proofs_dir.join("custom_induction_theorem.lean");
+                if let Err(e) = std::fs::write(&artifact_path, &lean_code) {
+                    println!("[WARN] Failed to write induction proof: {}", e);
+                } else {
+                    println!("\nFormal Lean 4 Certification:");
+                    let val_result = axiomatic::Lean4Validator::validate_file(&artifact_path);
+                    match val_result {
+                        axiomatic::LeanValidationResult::Certified { elapsed_ms, lean_version } => {
+                            println!("  - Proof Artifact:  {}", artifact_path.display());
+                            println!("  - Status:          CERTIFIED by Lean 4 Kernel");
+                            println!("  - Kernel Time:     {:.3} ms", elapsed_ms);
+                            println!("  - Compiler:        {}", lean_version);
+                        }
+                        axiomatic::LeanValidationResult::CompilerError { stderr, stdout } => {
+                            println!("  - Proof Artifact:  {}", artifact_path.display());
+                            println!("  - Status:          COMPILER REJECTED");
+                            if !stderr.is_empty() { println!("  - Stderr:          {}", stderr.trim()); }
+                            if !stdout.is_empty() { println!("  - Stdout:          {}", stdout.trim()); }
+                        }
+                        axiomatic::LeanValidationResult::LeanNotInstalled { message } => {
+                            println!("  - Proof Artifact:  {}", artifact_path.display());
+                            println!("  - Status:          Lean 4 not detected ({})", message);
+                        }
+                    }
+                }
+                println!("================================================================================\n");
+                return;
+            }
+            Err(e) => {
+                println!("[WARN] Induction synthesis failed: {}. Falling back to standard MCTS search.", e);
+            }
+        }
+    }
+
     let (model, epochs, _) = axiomatic::ModelCheckpoint::try_load_or_init("models");
-    let policy: Box<dyn axiomatic::NeuralPolicy> = if is_bool || is_matrix || is_order || is_calculus || is_multivar || is_prob {
+    let policy: Box<dyn axiomatic::NeuralPolicy> = if is_bool || is_matrix || is_group || is_category || is_transforms || is_info || is_order || is_calculus || is_multivar || is_prob {
         Box::new(SymbolicNeuralPolicy::new())
     } else {
         if epochs > 0 {
@@ -329,7 +428,7 @@ fn run_autonomous_proof_cli(custom_conjecture: Option<&str>) {
     };
 
     let initial_state = ProofState::new(target_eq.clone());
-    let max_children = if is_calculus || is_multivar || is_prob { 12 } else { 8 };
+    let max_children = if is_calculus || is_multivar || is_prob || is_info || is_group || is_transforms || is_category { 12 } else { 8 };
     let mut mcts = MctsEngine::new(initial_state, max_children);
 
     let start = std::time::Instant::now();

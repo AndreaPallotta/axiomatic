@@ -16,3 +16,4 @@ showcase/
 dist/
 proofs/custom_theorem.lean
 proofs/polynomial_root_*.lean
+proofs/*induction*.lean

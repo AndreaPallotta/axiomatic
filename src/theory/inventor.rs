@@ -30,7 +30,11 @@ impl TheoryInventor {
             MathDomain::OrderTheory => Self::invent_order_theory(seed),
             MathDomain::MultivariableCalculus => Self::invent_multivariable_calculus(seed),
             MathDomain::Probability => Self::invent_probability(seed),
-            MathDomain::Unified => match seed % 9 {
+            MathDomain::InformationTheory => Self::invent_information_theory(seed),
+            MathDomain::GroupTheory => Self::invent_group_theory(seed),
+            MathDomain::IntegralTransforms => Self::invent_integral_transforms(seed),
+            MathDomain::CategoryTheory => Self::invent_category_theory(seed),
+            MathDomain::Unified => match seed % 13 {
                 0 => Self::invent_algebraic(seed),
                 1 => Self::invent_boolean(seed),
                 2 => Self::invent_calculus(seed),
@@ -39,8 +43,96 @@ impl TheoryInventor {
                 5 => Self::invent_linear_algebra(seed),
                 6 => Self::invent_order_theory(seed),
                 7 => Self::invent_multivariable_calculus(seed),
-                _ => Self::invent_probability(seed),
+                8 => Self::invent_probability(seed),
+                9 => Self::invent_information_theory(seed),
+                10 => Self::invent_group_theory(seed),
+                11 => Self::invent_integral_transforms(seed),
+                _ => Self::invent_category_theory(seed),
             },
+        }
+    }
+
+    fn invent_information_theory(seed: usize) -> Equality {
+        let x = Term::constant("X");
+        let y = Term::constant("Y");
+        match seed % 3 {
+            0 => Equality::new(
+                Term::func("MI", vec![x.clone(), y.clone()]),
+                Term::func("MI", vec![y, x]),
+            ),
+            1 => Equality::new(
+                Term::func("H", vec![Term::func("joint", vec![x.clone(), y.clone()])]),
+                Term::func("+", vec![
+                    Term::func("H", vec![y.clone()]),
+                    Term::func("cond_H", vec![x, y]),
+                ]),
+            ),
+            _ => Equality::new(
+                Term::func("MI", vec![x.clone(), x.clone()]),
+                Term::func("H", vec![x]),
+            ),
+        }
+    }
+
+    fn invent_group_theory(seed: usize) -> Equality {
+        let x = Term::constant("x");
+        let y = Term::constant("y");
+        match seed % 3 {
+            0 => Equality::new(
+                Term::func("phi", vec![Term::func("*", vec![x.clone(), y.clone()])]),
+                Term::func("*", vec![Term::func("phi", vec![x]), Term::func("phi", vec![y])]),
+            ),
+            1 => Equality::new(
+                Term::func("inv", vec![Term::func("*", vec![x.clone(), y.clone()])]),
+                Term::func("*", vec![Term::func("inv", vec![y]), Term::func("inv", vec![x])]),
+            ),
+            _ => Equality::new(
+                Term::func("phi", vec![Term::func("inv", vec![x.clone()])]),
+                Term::func("inv", vec![Term::func("phi", vec![x])]),
+            ),
+        }
+    }
+
+    fn invent_integral_transforms(seed: usize) -> Equality {
+        let f = Term::constant("f");
+        let g = Term::constant("g");
+        match seed % 3 {
+            0 => Equality::new(
+                Term::func("F", vec![Term::func("conv", vec![f.clone(), g.clone()])]),
+                Term::func("*", vec![Term::func("F", vec![f]), Term::func("F", vec![g])]),
+            ),
+            1 => Equality::new(
+                Term::func("L", vec![Term::func("conv", vec![f.clone(), g.clone()])]),
+                Term::func("*", vec![Term::func("L", vec![f]), Term::func("L", vec![g])]),
+            ),
+            _ => Equality::new(
+                Term::func("F", vec![Term::func("+", vec![f.clone(), g.clone()])]),
+                Term::func("+", vec![Term::func("F", vec![f]), Term::func("F", vec![g])]),
+            ),
+        }
+    }
+
+    fn invent_category_theory(seed: usize) -> Equality {
+        let f = Term::constant("f");
+        let g = Term::constant("g");
+        let func = Term::constant("F");
+        let id_m = Term::constant("id");
+        match seed % 3 {
+            0 => Equality::new(
+                Term::func("comp", vec![id_m.clone(), f.clone()]),
+                f,
+            ),
+            1 => Equality::new(
+                Term::func("Map", vec![func.clone(), Term::func("comp", vec![g.clone(), f.clone()])]),
+                Term::func("comp", vec![
+                    Term::func("Map", vec![func.clone(), g]),
+                    Term::func("Map", vec![func, f]),
+                ]),
+            ),
+            _ => Equality::new(
+                Term::func("Map", vec![func, id_m.clone()]),
+                id_m,
+            ),
         }
     }
 
