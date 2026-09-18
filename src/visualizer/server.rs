@@ -423,6 +423,7 @@ pub async fn start_visualizer_server(port: u16, controller: EngineController) {
         .route("/ws", get(websocket_handler))
         .route("/api/status", get(get_status_handler))
         .route("/api/vectordb", get(get_vectordb_handler))
+        .route("/api/vector_space_3d", get(get_vector_space_3d_handler))
         .route("/api/vectordb/search", post(post_vectordb_search_handler))
         .route("/api/domain/select", post(post_domain_select_handler))
         .route("/api/step", post(post_step_handler))
@@ -609,6 +610,55 @@ async fn post_vectordb_search_handler(
             "message": format!("Could not parse query: {}", e),
         })),
     }
+}
+
+async fn get_vector_space_3d_handler(
+    Extension(state): Extension<SharedState>,
+) -> Json<crate::memory::vectordb::VectorSpace3D> {
+    let ctrl = state.read().await;
+
+    let mut trajectory_states: Vec<(String, Vec<f64>)> = Vec::new();
+    if !ctrl.mcts.nodes.is_empty() {
+        let target_node_id = ctrl.mcts.proven_node_id.unwrap_or_else(|| {
+            let mut best_id = 0;
+            let mut max_visits = 0;
+            for node in &ctrl.mcts.nodes {
+                if node.visit_count > max_visits {
+                    max_visits = node.visit_count;
+                    best_id = node.id;
+                }
+            }
+            best_id
+        });
+
+        let mut path = Vec::new();
+        let mut curr = Some(target_node_id);
+        let mut visited = std::collections::HashSet::new();
+        while let Some(id) = curr {
+            if !visited.insert(id) || id >= ctrl.mcts.nodes.len() {
+                break;
+            }
+            path.push(id);
+            curr = ctrl.mcts.nodes[id].parent_id;
+        }
+        path.reverse();
+
+        for id in path {
+            let node = &ctrl.mcts.nodes[id];
+            let state_str = if let Some(goal) = node.state.open_goals.first() {
+                goal.equality.to_string()
+            } else if node.state.is_solved {
+                "Q.E.D.".to_string()
+            } else {
+                format!("Node {}", id)
+            };
+            let vec = vectorize_proof_state(&node.state);
+            trajectory_states.push((state_str, vec));
+        }
+    }
+
+    let space3d = ctrl.vectordb.project_to_3d(&trajectory_states);
+    Json(space3d)
 }
 
 #[derive(Deserialize)]
@@ -1196,7 +1246,7 @@ async fn serve_dashboard_html() -> Html<&'static str> {
     Html(DASHBOARD_HTML)
 }
 
-pub const DASHBOARD_HTML: &str = r#"<!DOCTYPE html>
+pub const DASHBOARD_HTML: &str = r##"<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -1475,6 +1525,11 @@ pub const DASHBOARD_HTML: &str = r#"<!DOCTYPE html>
         <div class="canvas-card">
             <!-- Canvas Controls Sub-Toolbar -->
             <div class="sub-toolbar">
+                <div class="toolbar-group" style="display:flex; align-items:center; gap:4px; margin-right:6px; border-right:1px solid var(--md-border); padding-right:8px;">
+                    <button id="btn-view-2d" class="btn btn-filled btn-sm" onclick="switchViewMode('2d')" style="font-weight:700;">2D Proof Tree</button>
+                    <button id="btn-view-3d" class="btn btn-tonal btn-sm" onclick="switchViewMode('3d')" style="font-weight:700;">3D Vector Galaxy</button>
+                </div>
+
                 <div class="toolbar-group" style="display:flex; align-items:center; gap:6px; flex:1; min-width:340px;">
                     <span style="font-size:0.72rem; font-weight:700; color:var(--md-text-secondary);">GOAL:</span>
                     <input type="text" id="goal-input" value="((x + -(x)) + (y * 1)) = (0 + y)" oninput="this.dataset.dirty='true'" onkeydown="if(event.key==='Enter') setGoalFromInput()" style="flex:1; max-width:240px; padding:4px 8px; border-radius:6px; border:1px solid var(--md-border); font-family:'Roboto Mono', monospace; font-size:0.75rem; outline:none;">
@@ -1511,6 +1566,30 @@ pub const DASHBOARD_HTML: &str = r#"<!DOCTYPE html>
             </div>
 
             <canvas id="tree-canvas"></canvas>
+            <div id="galaxy-container" style="display:none; position:relative; flex:1; width:100%; height:100%; overflow:hidden;">
+                <canvas id="galaxy-canvas" style="width:100%; height:100%; cursor:grab; background:radial-gradient(ellipse at center, #111927 0%, #080b11 100%);"></canvas>
+                <div id="galaxy-hud" style="position:absolute; top:10px; left:12px; pointer-events:none; display:flex; flex-direction:column; gap:6px; font-family:'Google Sans', sans-serif;">
+                    <div style="background:rgba(15,23,42,0.75); backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:5px 10px; color:#fff; font-size:0.72rem; display:flex; align-items:center; gap:10px;">
+                        <span>Theorems: <b id="galaxy-theorems-count" style="color:#60a5fa;">0</b></span>
+                        <span>Trajectory: <b id="galaxy-traj-count" style="color:#34d399;">0</b></span>
+                        <span>Yaw: <b id="galaxy-yaw-val" style="color:#cbd5e1;">-31°</b></span>
+                        <span>Pitch: <b id="galaxy-pitch-val" style="color:#cbd5e1;">20°</b></span>
+                    </div>
+                    <div style="background:rgba(15,23,42,0.75); backdrop-filter:blur(8px); border:1px solid rgba(255,255,255,0.1); border-radius:8px; padding:5px 8px; color:#94a3b8; font-size:0.65rem; display:flex; gap:8px; align-items:center;">
+                        <span style="display:flex; align-items:center; gap:3px;"><span style="width:7px; height:7px; border-radius:50%; background:#2979ff; display:inline-block;"></span> Algebra</span>
+                        <span style="display:flex; align-items:center; gap:3px;"><span style="width:7px; height:7px; border-radius:50%; background:#b060ff; display:inline-block;"></span> Boolean</span>
+                        <span style="display:flex; align-items:center; gap:3px;"><span style="width:7px; height:7px; border-radius:50%; background:#ff9800; display:inline-block;"></span> Calculus</span>
+                        <span style="display:flex; align-items:center; gap:3px;"><span style="width:7px; height:7px; border-radius:50%; background:#26a69a; display:inline-block;"></span> Set Theory</span>
+                        <span style="display:flex; align-items:center; gap:3px;"><span style="width:7px; height:7px; border-radius:50%; background:#00bcd4; display:inline-block;"></span> LinAlg</span>
+                    </div>
+                </div>
+                <div id="galaxy-tooltip" style="display:none; position:absolute; pointer-events:none; background:rgba(15,23,42,0.92); backdrop-filter:blur(10px); border:1px solid rgba(255,255,255,0.18); border-radius:8px; padding:8px 12px; color:#fff; font-size:0.72rem; max-width:280px; box-shadow:0 8px 24px rgba(0,0,0,0.5); z-index:20;">
+                    <div id="galaxy-tt-title" style="font-weight:700; font-size:0.78rem; color:#60a5fa; font-family:'Google Sans',sans-serif;"></div>
+                    <div id="galaxy-tt-domain" style="font-size:0.65rem; color:#94a3b8; margin-top:2px;"></div>
+                    <div id="galaxy-tt-stmt" style="font-family:'Roboto Mono',monospace; font-size:0.72rem; color:#f1f5f9; margin-top:4px; word-break:break-all;"></div>
+                    <div id="galaxy-tt-tactic" style="font-size:0.65rem; color:#34d399; margin-top:4px;"></div>
+                </div>
+            </div>
         </div>
 
         <!-- Right Side Unified Cockpit Dock -->
@@ -1523,6 +1602,24 @@ pub const DASHBOARD_HTML: &str = r#"<!DOCTYPE html>
                 </div>
                 <div class="proof-scroll" id="proof-container">
                     <div style="font-size:0.7rem; color:var(--md-text-secondary);">Watch search tree grow in real-time or click "Start Autonomous Engine"...</div>
+                </div>
+            </div>
+
+            <!-- Interactive Equation AST Inspector Card -->
+            <div class="dock-card">
+                <div class="dock-card-header">
+                    <span class="dock-card-title">Equation AST Inspector</span>
+                    <span id="ast-target-name" style="font-size:0.7rem; font-weight:700; color:var(--md-primary);">Goal</span>
+                </div>
+                <div id="ast-equation-expr" style="font-family:'Roboto Mono', monospace; font-size:0.72rem; background:var(--md-surface-variant); padding:5px 8px; border-radius:6px; border:1px solid var(--md-border); word-break:break-all; font-weight:600; color:var(--md-text-primary);">((x + -(x)) + (y * 1)) = (0 + y)</div>
+                <div id="ast-svg-container" style="width:100%; height:150px; overflow:auto; background:#ffffff; border:1px solid var(--md-border); border-radius:6px; position:relative; margin-top:4px;"></div>
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.65rem; color:var(--md-text-secondary); margin-top:4px;">
+                    <span style="display:flex; align-items:center; gap:4px;">
+                        <span style="width:8px; height:8px; border-radius:50%; background:#1a73e8; display:inline-block;"></span> Op
+                        <span style="width:8px; height:8px; border-radius:3px; background:#e8f0fe; border:1px solid #1a73e8; display:inline-block; margin-left:4px;"></span> Term
+                        <span style="width:8px; height:8px; border-radius:50%; background:#e37400; display:inline-block; margin-left:4px;"></span> Rewrite
+                    </span>
+                    <span id="ast-node-count" style="font-weight:600;">0 nodes</span>
                 </div>
             </div>
 
@@ -1591,6 +1688,47 @@ pub const DASHBOARD_HTML: &str = r#"<!DOCTYPE html>
         const ctx = canvas.getContext('2d');
         const lossCanvas = document.getElementById('loss-canvas');
         const lossCtx = lossCanvas.getContext('2d');
+        const galaxyCanvas = document.getElementById('galaxy-canvas');
+        const galaxyCtx = galaxyCanvas.getContext('2d');
+
+        let currentViewMode = '2d';
+        let vectorSpace3D = { points: [], trajectory: [], total_theorems: 0 };
+        let galaxyRotX = 0.35;
+        let galaxyRotY = -0.55;
+        let galaxyCamDist = 340;
+        let galaxyPanX = 0;
+        let galaxyPanY = 0;
+        let isGalaxyDragging = false;
+        let galaxyDragStartX = 0;
+        let galaxyDragStartY = 0;
+        let isGalaxyPanDrag = false;
+        let hoveredPoint3D = null;
+        let selectedPoint3D = null;
+        let hasInitializedAst = false;
+        let galaxyProjectedItems = [];
+
+        function switchViewMode(mode) {
+            currentViewMode = mode;
+            const btn2d = document.getElementById('btn-view-2d');
+            const btn3d = document.getElementById('btn-view-3d');
+            const treeEl = document.getElementById('tree-canvas');
+            const galaxyEl = document.getElementById('galaxy-container');
+
+            if (mode === '2d') {
+                if (btn2d) btn2d.className = 'btn btn-filled btn-sm';
+                if (btn3d) btn3d.className = 'btn btn-tonal btn-sm';
+                if (treeEl) treeEl.style.display = 'block';
+                if (galaxyEl) galaxyEl.style.display = 'none';
+                scheduleRedraw(false);
+            } else {
+                if (btn3d) btn3d.className = 'btn btn-filled btn-sm';
+                if (btn2d) btn2d.className = 'btn btn-tonal btn-sm';
+                if (treeEl) treeEl.style.display = 'none';
+                if (galaxyEl) galaxyEl.style.display = 'block';
+                resizeCanvases();
+                fetchVectorSpace3D();
+            }
+        }
 
         let nodes = [];
         let lossHistory = [];
@@ -1667,6 +1805,11 @@ pub const DASHBOARD_HTML: &str = r#"<!DOCTYPE html>
                 canvas.width = canvas.parentElement.clientWidth;
                 canvas.height = canvas.parentElement.clientHeight - 80;
             }
+            if (galaxyCanvas && galaxyCanvas.parentElement) {
+                galaxyCanvas.width = galaxyCanvas.parentElement.clientWidth;
+                galaxyCanvas.height = galaxyCanvas.parentElement.clientHeight;
+                if (currentViewMode === '3d') renderGalaxy();
+            }
             if (lossCanvas && lossCanvas.parentElement) {
                 lossCanvas.width = lossCanvas.parentElement.clientWidth - 24;
                 lossCanvas.height = 50;
@@ -1688,13 +1831,16 @@ pub const DASHBOARD_HTML: &str = r#"<!DOCTYPE html>
                 if (data.TreeReset) {
                     nodes = data.TreeReset.nodes || [];
                     scheduleRedraw(true);
+                    if (currentViewMode === '3d') fetchVectorSpace3D();
                 } else if (data.nodes) {
                     nodes = data.nodes;
                     scheduleRedraw(false);
+                    if (currentViewMode === '3d') fetchVectorSpace3D();
                 } else if (data.NodeCreated) {
                     if (!nodes.some(n => n.id === data.NodeCreated.id)) {
                         nodes.push(data.NodeCreated);
                         scheduleRedraw(false);
+                        if (currentViewMode === '3d') fetchVectorSpace3D();
                     }
                 } else if (data.NodeVisited) {
                     const n = nodes.find(x => x.id === data.NodeVisited.id);
@@ -1706,6 +1852,7 @@ pub const DASHBOARD_HTML: &str = r#"<!DOCTYPE html>
                 } else if (data.ProofDiscovered) {
                     highlightProof(data.ProofDiscovered.node_id);
                     scheduleRedraw(true);
+                    if (currentViewMode === '3d') fetchVectorSpace3D();
                 }
             } catch (e) { console.error(e); }
         };
@@ -1721,7 +1868,6 @@ pub const DASHBOARD_HTML: &str = r#"<!DOCTYPE html>
                     pathIds.add(curr.id);
                     curr = nodes.find(n => n.id === curr.parent_id);
                 }
-                // Include root and siblings of first level
                 nodes.forEach(n => {
                     if (n.parent_id === 0 && pathIds.has(0)) pathIds.add(n.id);
                 });
@@ -1739,6 +1885,10 @@ pub const DASHBOARD_HTML: &str = r#"<!DOCTYPE html>
                 const goalInput = document.getElementById('goal-input');
                 if (goalInput && document.activeElement !== goalInput && goalInput.dataset.dirty !== 'true') {
                     goalInput.value = data.conjecture;
+                }
+                if (!hasInitializedAst && data.conjecture) {
+                    hasInitializedAst = true;
+                    renderEquationAst(data.conjecture, 'Goal State', null);
                 }
                 document.getElementById('iter-count').innerText = data.iterations;
                 document.getElementById('stat-discoveries').innerText = data.invented_theorems_count || 0;
@@ -1865,6 +2015,7 @@ pub const DASHBOARD_HTML: &str = r#"<!DOCTYPE html>
                 inp.value = eq;
                 inp.dataset.dirty = 'false';
             }
+            renderEquationAst(eq, 'Target Goal', null);
             const res = await fetch('/api/conjecture/custom', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1875,6 +2026,7 @@ pub const DASHBOARD_HTML: &str = r#"<!DOCTYPE html>
                 nodes = data.graph.nodes;
                 scheduleRedraw(true);
             }
+            if (currentViewMode === '3d') fetchVectorSpace3D();
             fetchStatus();
         }
 
@@ -1889,6 +2041,7 @@ pub const DASHBOARD_HTML: &str = r#"<!DOCTYPE html>
                 nodes = data.graph.nodes;
                 scheduleRedraw(true);
             }
+            if (currentViewMode === '3d') fetchVectorSpace3D();
             fetchStatus();
         }
 
@@ -2204,9 +2357,691 @@ pub const DASHBOARD_HTML: &str = r#"<!DOCTYPE html>
             if (closest) {
                 selectedNodeId = closest.id;
                 renderTree(visNodes);
+                updateAstForNode(closest);
+            }
+        });
+
+        function updateAstForNode(node) {
+            if (!node) return;
+            let eqStr = "";
+            if (node.state && node.state.open_goals && node.state.open_goals.length > 0) {
+                const g = node.state.open_goals[0];
+                if (g.equality) {
+                    eqStr = `${g.equality.lhs} = ${g.equality.rhs}`;
+                } else {
+                    eqStr = String(g);
+                }
+            } else if (node.is_proven) {
+                eqStr = "Q.E.D.";
+            } else {
+                eqStr = document.getElementById('goal-input').value;
+            }
+
+            let rewriteInfo = null;
+            if (node.applied_tactic) {
+                const tac = node.applied_tactic;
+                if (tac.RewriteLhs || (typeof tac === 'string' && tac.includes('lhs'))) {
+                    rewriteInfo = { side: 'lhs', name: tac.RewriteLhs || tac };
+                } else if (tac.RewriteRhs || (typeof tac === 'string' && tac.includes('rhs'))) {
+                    rewriteInfo = { side: 'rhs', name: tac.RewriteRhs || tac };
+                } else {
+                    rewriteInfo = { side: 'all', name: JSON.stringify(tac) };
+                }
+            }
+            renderEquationAst(eqStr, `Node #${node.id} ${node.is_proven ? '(Q.E.D.)' : ''}`, rewriteInfo);
+        }
+
+        function updateAstForVectorPoint(pt) {
+            if (!pt) return;
+            renderEquationAst(pt.statement, pt.name, {
+                is_theorem: true,
+                tactic: pt.tactic_name,
+                domain: pt.domain
+            });
+        }
+
+        function renderEquationAst(rawEquation, title, rewriteInfo) {
+            const titleEl = document.getElementById('ast-target-name');
+            const exprEl = document.getElementById('ast-equation-expr');
+            const container = document.getElementById('ast-svg-container');
+            const countEl = document.getElementById('ast-node-count');
+            if (!container) return;
+
+            if (titleEl) titleEl.innerText = title || 'Goal';
+            if (exprEl) exprEl.innerText = rawEquation || '(empty)';
+
+            const ast = parseEquationAST(rawEquation);
+
+            if (rewriteInfo && ast) {
+                if (rewriteInfo.is_theorem) {
+                    if (ast.children && ast.children.length > 1) {
+                        markSubtreeRewritten(ast.children[1]);
+                    }
+                } else if (rewriteInfo.side === 'lhs' && ast.children && ast.children.length > 0) {
+                    markSubtreeRewritten(ast.children[0]);
+                } else if (rewriteInfo.side === 'rhs' && ast.children && ast.children.length > 1) {
+                    markSubtreeRewritten(ast.children[1]);
+                } else if (rewriteInfo.side === 'all') {
+                    markSubtreeRewritten(ast);
+                }
+            }
+
+            function markSubtreeRewritten(node) {
+                if (!node) return;
+                node.is_rewritten = true;
+                if (node.children) {
+                    node.children.forEach(markSubtreeRewritten);
+                }
+            }
+
+            function computeAstWidths(node) {
+                if (!node) return 0;
+                if (!node.children || node.children.length === 0) {
+                    const charLen = (node.label || '').length;
+                    node.width = Math.max(36, charLen * 7.5 + 14);
+                    return node.width;
+                }
+                let sumWidth = 0;
+                node.children.forEach((child, idx) => {
+                    sumWidth += computeAstWidths(child);
+                    if (idx > 0) sumWidth += 14;
+                });
+                node.width = Math.max(36, sumWidth);
+                return node.width;
+            }
+
+            let maxAstY = 0;
+            let totalAstNodes = 0;
+            function assignAstPositions(node, xStart, y) {
+                if (!node) return;
+                totalAstNodes++;
+                node.y = y;
+                if (y > maxAstY) maxAstY = y;
+                if (!node.children || node.children.length === 0) {
+                    node.x = xStart + node.width / 2;
+                    return;
+                }
+                let currX = xStart;
+                node.children.forEach(child => {
+                    assignAstPositions(child, currX, y + 36);
+                    currX += child.width + 14;
+                });
+                const firstX = node.children[0].x;
+                const lastX = node.children[node.children.length - 1].x;
+                node.x = (firstX + lastX) / 2;
+            }
+
+            computeAstWidths(ast);
+            const paddingX = 24;
+            const contWidth = Math.max(380, container.clientWidth || 380);
+            const startX = Math.max(paddingX, (contWidth - ast.width) / 2);
+            assignAstPositions(ast, startX, 22);
+
+            const svgWidth = Math.max(contWidth, ast.width + paddingX * 2);
+            const svgHeight = Math.max(140, maxAstY + 36);
+
+            let pathsSvg = '';
+            let nodesSvg = '';
+
+            function collectSvgElements(node, parent) {
+                if (!node) return;
+                if (parent) {
+                    const isRewrittenEdge = node.is_rewritten || parent.is_rewritten;
+                    const stroke = isRewrittenEdge ? '#e37400' : '#dadce0';
+                    const strokeWidth = isRewrittenEdge ? '2.5' : '1.5';
+                    const midY = (parent.y + node.y) / 2;
+                    pathsSvg += `<path d="M ${parent.x} ${parent.y + 11} C ${parent.x} ${midY}, ${node.x} ${midY}, ${node.x} ${node.y - 10}" fill="none" stroke="${stroke}" stroke-width="${strokeWidth}" />`;
+                }
+                if (node.type === 'op') {
+                    const isEq = node.isEqualityRoot;
+                    const r = isEq ? 13 : 11;
+                    const fill = node.is_rewritten ? '#fef7e0' : (isEq ? '#e8f0fe' : '#f1f3f4');
+                    const stroke = node.is_rewritten ? '#e37400' : (isEq ? '#1a73e8' : '#5f6368');
+                    const textFill = node.is_rewritten ? '#b06000' : (isEq ? '#1a73e8' : '#202124');
+                    if (node.is_rewritten) {
+                        nodesSvg += `<circle cx="${node.x}" cy="${node.y}" r="${r + 4}" fill="none" stroke="#e37400" stroke-width="1.5" opacity="0.6" />`;
+                    }
+                    nodesSvg += `<circle cx="${node.x}" cy="${node.y}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="2" />`;
+                    nodesSvg += `<text x="${node.x}" y="${node.y + 3.5}" text-anchor="middle" font-family="sans-serif" font-size="10px" font-weight="700" fill="${textFill}">${escapeHtml(node.label)}</text>`;
+                } else {
+                    const charLen = (node.label || '').length;
+                    const boxW = Math.max(26, charLen * 7.5 + 10);
+                    const boxH = 18;
+                    const rx = 5;
+                    const fill = node.is_rewritten ? '#fef7e0' : '#ffffff';
+                    const stroke = node.is_rewritten ? '#e37400' : '#dadce0';
+                    const textFill = node.is_rewritten ? '#b06000' : '#202124';
+                    if (node.is_rewritten) {
+                        nodesSvg += `<rect x="${node.x - boxW / 2 - 3}" y="${node.y - boxH / 2 - 3}" width="${boxW + 6}" height="${boxH + 6}" rx="${rx + 2}" fill="none" stroke="#e37400" stroke-width="1.5" opacity="0.6" />`;
+                    }
+                    nodesSvg += `<rect x="${node.x - boxW / 2}" y="${node.y - boxH / 2}" width="${boxW}" height="${boxH}" rx="${rx}" fill="${fill}" stroke="${stroke}" stroke-width="1.5" />`;
+                    nodesSvg += `<text x="${node.x}" y="${node.y + 3.5}" text-anchor="middle" font-family="monospace" font-size="9px" font-weight="500" fill="${textFill}">${escapeHtml(node.label)}</text>`;
+                }
+
+                if (node.children) {
+                    node.children.forEach(child => collectSvgElements(child, node));
+                }
+            }
+
+            collectSvgElements(ast, null);
+
+            container.innerHTML = `<svg width="${svgWidth}" height="${svgHeight}" xmlns="http://www.w3.org/2000/svg" style="display:block;">${pathsSvg}${nodesSvg}</svg>`;
+            if (countEl) countEl.innerText = `${totalAstNodes} nodes`;
+        }
+
+        function parseEquationAST(rawStr) {
+            if (!rawStr || typeof rawStr !== 'string') {
+                return { id: 1, label: 'empty', type: 'leaf', children: [] };
+            }
+            const clean = rawStr.trim();
+            if (clean === "Q.E.D.") {
+                return { id: 1, label: "Q.E.D.", type: "leaf", children: [] };
+            }
+
+            let eqIdx = -1;
+            let parenDepth = 0;
+            for (let i = 0; i < clean.length; i++) {
+                const c = clean[i];
+                if (c === '(') parenDepth++;
+                else if (c === ')') parenDepth--;
+                else if (c === '=' && parenDepth === 0) {
+                    eqIdx = i;
+                    break;
+                }
+            }
+
+            let nextNodeId = 1;
+
+            function tokenize(s) {
+                const tokens = [];
+                let i = 0;
+                while (i < s.length) {
+                    const ch = s[i];
+                    if (/\s/.test(ch)) {
+                        i++;
+                        continue;
+                    }
+                    if (ch === '(' || ch === ')') {
+                        tokens.push({ type: 'paren', value: ch });
+                        i++;
+                    } else if (['+', '*', '/', '^', '&', '|', '!'].includes(ch)) {
+                        tokens.push({ type: 'op', value: ch });
+                        i++;
+                    } else if (ch === '-') {
+                        tokens.push({ type: 'op', value: '-' });
+                        i++;
+                    } else {
+                        let j = i;
+                        while (j < s.length && !/\s/.test(s[j]) && !['(', ')', '+', '*', '/', '^', '&', '|', '!', '-', '='].includes(s[j])) {
+                            j++;
+                        }
+                        const val = s.slice(i, j).trim();
+                        if (val.length > 0) {
+                            tokens.push({ type: 'ident', value: val });
+                        }
+                        i = j;
+                    }
+                }
+                return tokens;
+            }
+
+            function parseTokens(tokens) {
+                if (!tokens || tokens.length === 0) return null;
+
+                while (tokens.length >= 2 && tokens[0].value === '(' && tokens[tokens.length - 1].value === ')') {
+                    let depth = 0;
+                    let wrapsAll = true;
+                    for (let i = 0; i < tokens.length - 1; i++) {
+                        if (tokens[i].value === '(') depth++;
+                        else if (tokens[i].value === ')') depth--;
+                        if (depth === 0) {
+                            wrapsAll = false;
+                            break;
+                        }
+                    }
+                    if (wrapsAll) {
+                        tokens = tokens.slice(1, tokens.length - 1);
+                    } else {
+                        break;
+                    }
+                }
+
+                if (tokens.length === 0) return null;
+                if (tokens.length === 1) {
+                    return {
+                        id: nextNodeId++,
+                        label: tokens[0].value,
+                        type: 'leaf',
+                        children: []
+                    };
+                }
+
+                const opPrecedence = { '|': 1, '&': 2, '+': 3, '-': 3, '*': 4, '/': 4, '^': 5 };
+                let minPrec = 999;
+                let splitIdx = -1;
+                let depth = 0;
+
+                for (let i = tokens.length - 1; i >= 0; i--) {
+                    const tok = tokens[i];
+                    if (tok.value === ')') depth++;
+                    else if (tok.value === '(') depth--;
+                    else if (depth === 0 && tok.type === 'op' && opPrecedence[tok.value] !== undefined) {
+                        if (tok.value === '-' && (i === 0 || tokens[i - 1].type === 'op' || tokens[i - 1].value === '(')) {
+                            continue;
+                        }
+                        const prec = opPrecedence[tok.value];
+                        if (prec < minPrec) {
+                            minPrec = prec;
+                            splitIdx = i;
+                        }
+                    }
+                }
+
+                if (splitIdx !== -1) {
+                    const opTok = tokens[splitIdx];
+                    const leftSub = parseTokens(tokens.slice(0, splitIdx));
+                    const rightSub = parseTokens(tokens.slice(splitIdx + 1));
+                    const children = [];
+                    if (leftSub) children.push(leftSub);
+                    if (rightSub) children.push(rightSub);
+                    return {
+                        id: nextNodeId++,
+                        label: opTok.value,
+                        type: 'op',
+                        children
+                    };
+                }
+
+                if (tokens[0].type === 'op' && ['!', '-'].includes(tokens[0].value)) {
+                    const childSub = parseTokens(tokens.slice(1));
+                    return {
+                        id: nextNodeId++,
+                        label: tokens[0].value,
+                        type: 'op',
+                        children: childSub ? [childSub] : []
+                    };
+                }
+
+                const label = tokens.map(t => t.value).join(' ');
+                return {
+                    id: nextNodeId++,
+                    label,
+                    type: 'leaf',
+                    children: []
+                };
+            }
+
+            if (eqIdx !== -1) {
+                const leftStr = clean.slice(0, eqIdx).trim();
+                const rightStr = clean.slice(eqIdx + 1).trim();
+                const leftAst = parseTokens(tokenize(leftStr));
+                const rightAst = parseTokens(tokenize(rightStr));
+                const children = [];
+                if (leftAst) children.push(leftAst);
+                if (rightAst) children.push(rightAst);
+                return {
+                    id: nextNodeId++,
+                    label: '=',
+                    type: 'op',
+                    isEqualityRoot: true,
+                    children
+                };
+            } else {
+                const ast = parseTokens(tokenize(clean));
+                return ast || { id: nextNodeId++, label: clean, type: 'leaf', children: [] };
+            }
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        const DOMAIN_PALETTE = {
+            'Boolean Logic': { base: '#b060ff', glow: 'rgba(176, 96, 255, 0.45)', fill: '#e9d5ff' },
+            'Symbolic Calculus': { base: '#ff9800', glow: 'rgba(255, 152, 0, 0.45)', fill: '#fed7aa' },
+            'Set Theory & Induction': { base: '#26a69a', glow: 'rgba(38, 166, 154, 0.45)', fill: '#99f6e4' },
+            'Linear Algebra': { base: '#00bcd4', glow: 'rgba(0, 188, 212, 0.45)', fill: '#a5f3fc' },
+            'Abstract Algebra': { base: '#2979ff', glow: 'rgba(41, 121, 255, 0.45)', fill: '#bfdbfe' }
+        };
+
+        async function fetchVectorSpace3D() {
+            try {
+                const res = await fetch('/api/vector_space_3d');
+                if (res.ok) {
+                    vectorSpace3D = await res.json();
+                    const thEl = document.getElementById('galaxy-theorems-count');
+                    const trEl = document.getElementById('galaxy-traj-count');
+                    if (thEl) thEl.innerText = vectorSpace3D.total_theorems;
+                    if (trEl) trEl.innerText = (vectorSpace3D.trajectory || []).length;
+                    renderGalaxy();
+                }
+            } catch (e) {
+                console.error("Failed to load 3D vector space", e);
+            }
+        }
+
+        function renderGalaxy() {
+            if (!galaxyCanvas || !galaxyCtx) return;
+            const w = galaxyCanvas.width;
+            const h = galaxyCanvas.height;
+            if (w <= 0 || h <= 0) return;
+
+            galaxyCtx.clearRect(0, 0, w, h);
+
+            const cx = w / 2;
+            const cy = h / 2;
+            const bgGrad = galaxyCtx.createRadialGradient(cx, cy, 40, cx, cy, Math.max(cx, cy));
+            bgGrad.addColorStop(0, '#131b2e');
+            bgGrad.addColorStop(0.65, '#0b0f19');
+            bgGrad.addColorStop(1, '#05070c');
+            galaxyCtx.fillStyle = bgGrad;
+            galaxyCtx.fillRect(0, 0, w, h);
+
+            galaxyCtx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+            for (let i = 0; i < 75; i++) {
+                const sx = (Math.sin(i * 19.3) * 0.5 + 0.5) * w;
+                const sy = (Math.cos(i * 27.7) * 0.5 + 0.5) * h;
+                const sr = (i % 3 === 0) ? 1.4 : 0.9;
+                galaxyCtx.beginPath();
+                galaxyCtx.arc(sx, sy, sr, 0, Math.PI * 2);
+                galaxyCtx.fill();
+            }
+
+            const cosY = Math.cos(galaxyRotY);
+            const sinY = Math.sin(galaxyRotY);
+            const cosX = Math.cos(galaxyRotX);
+            const sinX = Math.sin(galaxyRotX);
+            const fov = 420;
+
+            function project(x, y, z) {
+                const x1 = x * cosY + z * sinY;
+                const z1 = -x * sinY + z * cosY;
+                const y2 = y * cosX - z1 * sinX;
+                const z2 = y * sinX + z1 * cosX;
+                const zCam = z2 + galaxyCamDist;
+                if (zCam <= 10) return null;
+                const scale = fov / zCam;
+                const sx = cx + galaxyPanX + x1 * scale;
+                const sy = cy + galaxyPanY - y2 * scale;
+                return { sx, sy, scale, zCam };
+            }
+
+            galaxyCtx.lineWidth = 1;
+            galaxyCtx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+            const gridRange = 140;
+            const gridStep = 35;
+            for (let g = -gridRange; g <= gridRange; g += gridStep) {
+                const p1 = project(g, 0, -gridRange);
+                const p2 = project(g, 0, gridRange);
+                if (p1 && p2) {
+                    galaxyCtx.beginPath();
+                    galaxyCtx.moveTo(p1.sx, p1.sy);
+                    galaxyCtx.lineTo(p2.sx, p2.sy);
+                    galaxyCtx.stroke();
+                }
+                const p3 = project(-gridRange, 0, g);
+                const p4 = project(gridRange, 0, g);
+                if (p3 && p4) {
+                    galaxyCtx.beginPath();
+                    galaxyCtx.moveTo(p3.sx, p3.sy);
+                    galaxyCtx.lineTo(p4.sx, p4.sy);
+                    galaxyCtx.stroke();
+                }
+            }
+
+            const traj = vectorSpace3D.trajectory || [];
+            if (traj.length > 1) {
+                galaxyCtx.strokeStyle = 'rgba(52, 211, 153, 0.85)';
+                galaxyCtx.lineWidth = 2.5;
+                galaxyCtx.setLineDash([5, 4]);
+                galaxyCtx.beginPath();
+                let started = false;
+                for (let i = 0; i < traj.length; i++) {
+                    const pr = project(traj[i].x, traj[i].y, traj[i].z);
+                    if (pr) {
+                        if (!started) {
+                            galaxyCtx.moveTo(pr.sx, pr.sy);
+                            started = true;
+                        } else {
+                            galaxyCtx.lineTo(pr.sx, pr.sy);
+                        }
+                    }
+                }
+                galaxyCtx.stroke();
+                galaxyCtx.setLineDash([]);
+            }
+
+            galaxyProjectedItems = [];
+
+            const pts = vectorSpace3D.points || [];
+            pts.forEach(pt => {
+                const pr = project(pt.x, pt.y, pt.z);
+                if (pr) {
+                    const radius = Math.max(3.5, Math.min(22, (4.8 + (pt.proof_length || 1) * 0.7) * pr.scale));
+                    galaxyProjectedItems.push({
+                        type: 'theorem',
+                        pt,
+                        sx: pr.sx,
+                        sy: pr.sy,
+                        scale: pr.scale,
+                        radius,
+                        zCam: pr.zCam
+                    });
+                }
+            });
+
+            traj.forEach(tr => {
+                const pr = project(tr.x, tr.y, tr.z);
+                if (pr) {
+                    galaxyProjectedItems.push({
+                        type: 'traj',
+                        tr,
+                        sx: pr.sx,
+                        sy: pr.sy,
+                        scale: pr.scale,
+                        radius: 8 * pr.scale,
+                        zCam: pr.zCam
+                    });
+                }
+            });
+
+            galaxyProjectedItems.sort((a, b) => b.zCam - a.zCam);
+
+            galaxyProjectedItems.forEach(item => {
+                if (item.type === 'theorem') {
+                    const pt = item.pt;
+                    const colors = DOMAIN_PALETTE[pt.domain] || DOMAIN_PALETTE['Abstract Algebra'];
+                    const isHovered = hoveredPoint3D && hoveredPoint3D.id === pt.id;
+                    const isSelected = selectedPoint3D && selectedPoint3D.id === pt.id;
+
+                    const r = (isHovered || isSelected) ? item.radius * 1.3 : item.radius;
+
+                    const haloGrad = galaxyCtx.createRadialGradient(item.sx, item.sy, r * 0.3, item.sx, item.sy, r * 2.8);
+                    haloGrad.addColorStop(0, colors.glow);
+                    haloGrad.addColorStop(1, 'rgba(0,0,0,0)');
+                    galaxyCtx.fillStyle = haloGrad;
+                    galaxyCtx.beginPath();
+                    galaxyCtx.arc(item.sx, item.sy, r * 2.8, 0, Math.PI * 2);
+                    galaxyCtx.fill();
+
+                    const sphereGrad = galaxyCtx.createRadialGradient(item.sx - r * 0.3, item.sy - r * 0.3, r * 0.1, item.sx, item.sy, r);
+                    sphereGrad.addColorStop(0, '#ffffff');
+                    sphereGrad.addColorStop(0.3, colors.fill);
+                    sphereGrad.addColorStop(0.8, colors.base);
+                    sphereGrad.addColorStop(1, '#0f172a');
+                    galaxyCtx.fillStyle = sphereGrad;
+                    galaxyCtx.beginPath();
+                    galaxyCtx.arc(item.sx, item.sy, r, 0, Math.PI * 2);
+                    galaxyCtx.fill();
+
+                    galaxyCtx.strokeStyle = isSelected ? '#fbbf24' : (isHovered ? '#ffffff' : colors.base);
+                    galaxyCtx.lineWidth = isSelected ? 2.5 : (isHovered ? 2.0 : 1.0);
+                    galaxyCtx.stroke();
+
+                    if (isSelected) {
+                        galaxyCtx.strokeStyle = '#fbbf24';
+                        galaxyCtx.lineWidth = 1.5;
+                        galaxyCtx.setLineDash([3, 3]);
+                        galaxyCtx.beginPath();
+                        galaxyCtx.arc(item.sx, item.sy, r * 2.2, 0, Math.PI * 2);
+                        galaxyCtx.stroke();
+                        galaxyCtx.setLineDash([]);
+                    }
+
+                    if (isHovered || isSelected || item.scale > 1.25) {
+                        galaxyCtx.font = '600 10px "Roboto Mono", monospace';
+                        const nameText = pt.name;
+                        const tw = galaxyCtx.measureText(nameText).width;
+                        const bx = item.sx + r + 6;
+                        const by = item.sy - 8;
+
+                        galaxyCtx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+                        galaxyCtx.fillRect(bx - 3, by - 2, tw + 6, 16);
+                        galaxyCtx.strokeStyle = colors.base;
+                        galaxyCtx.lineWidth = 1;
+                        galaxyCtx.strokeRect(bx - 3, by - 2, tw + 6, 16);
+
+                        galaxyCtx.fillStyle = '#ffffff';
+                        galaxyCtx.textBaseline = 'middle';
+                        galaxyCtx.textAlign = 'left';
+                        galaxyCtx.fillText(nameText, bx, by + 6);
+                    }
+                } else if (item.type === 'traj') {
+                    const tr = item.tr;
+                    galaxyCtx.fillStyle = '#10b981';
+                    galaxyCtx.beginPath();
+                    galaxyCtx.arc(item.sx, item.sy, Math.max(5, item.radius), 0, Math.PI * 2);
+                    galaxyCtx.fill();
+                    galaxyCtx.strokeStyle = '#34d399';
+                    galaxyCtx.lineWidth = 2;
+                    galaxyCtx.stroke();
+
+                    galaxyCtx.fillStyle = '#ffffff';
+                    galaxyCtx.font = '700 8px "Roboto Mono", monospace';
+                    galaxyCtx.textAlign = 'center';
+                    galaxyCtx.textBaseline = 'middle';
+                    galaxyCtx.fillText(`${tr.step + 1}`, item.sx, item.sy);
+                }
+            });
+        }
+
+        galaxyCanvas.addEventListener('mousedown', e => {
+            isGalaxyDragging = true;
+            isGalaxyPanDrag = (e.button === 2 || e.shiftKey);
+            galaxyDragStartX = e.clientX;
+            galaxyDragStartY = e.clientY;
+            galaxyCanvas.style.cursor = 'grabbing';
+        });
+
+        window.addEventListener('mouseup', () => {
+            if (isGalaxyDragging) {
+                isGalaxyDragging = false;
+                if (galaxyCanvas) galaxyCanvas.style.cursor = 'grab';
+            }
+        });
+
+        galaxyCanvas.addEventListener('contextmenu', e => e.preventDefault());
+
+        galaxyCanvas.addEventListener('mousemove', e => {
+            const rect = galaxyCanvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            if (isGalaxyDragging) {
+                const dx = e.clientX - galaxyDragStartX;
+                const dy = e.clientY - galaxyDragStartY;
+                galaxyDragStartX = e.clientX;
+                galaxyDragStartY = e.clientY;
+
+                if (isGalaxyPanDrag) {
+                    galaxyPanX += dx;
+                    galaxyPanY += dy;
+                } else {
+                    galaxyRotY += dx * 0.008;
+                    galaxyRotX = Math.max(-1.45, Math.min(1.45, galaxyRotX - dy * 0.008));
+                    const yawDeg = Math.round((galaxyRotY * 180 / Math.PI)) % 360;
+                    const pitchDeg = Math.round(galaxyRotX * 180 / Math.PI);
+                    const yawEl = document.getElementById('galaxy-yaw-val');
+                    const pitchEl = document.getElementById('galaxy-pitch-val');
+                    if (yawEl) yawEl.innerText = `${yawDeg}°`;
+                    if (pitchEl) pitchEl.innerText = `${pitchDeg}°`;
+                }
+                renderGalaxy();
+            } else {
+                let found = null;
+                for (let i = galaxyProjectedItems.length - 1; i >= 0; i--) {
+                    const item = galaxyProjectedItems[i];
+                    if (item.type === 'theorem') {
+                        const dist = Math.hypot(item.sx - mouseX, item.sy - mouseY);
+                        if (dist <= Math.max(14, item.radius + 6)) {
+                            found = item.pt;
+                            break;
+                        }
+                    }
+                }
+                if (found !== hoveredPoint3D) {
+                    hoveredPoint3D = found;
+                    const tt = document.getElementById('galaxy-tooltip');
+                    if (hoveredPoint3D && tt) {
+                        document.getElementById('galaxy-tt-title').innerText = hoveredPoint3D.name;
+                        document.getElementById('galaxy-tt-domain').innerText = `${hoveredPoint3D.domain} | Steps: ${hoveredPoint3D.proof_length}`;
+                        document.getElementById('galaxy-tt-stmt').innerText = hoveredPoint3D.statement;
+                        document.getElementById('galaxy-tt-tactic').innerText = hoveredPoint3D.tactic_name || '';
+                        tt.style.display = 'block';
+                        const maxX = galaxyCanvas.width - 290;
+                        const maxY = galaxyCanvas.height - 110;
+                        tt.style.left = `${Math.min(maxX, mouseX + 16)}px`;
+                        tt.style.top = `${Math.min(maxY, mouseY + 10)}px`;
+                    } else if (tt) {
+                        tt.style.display = 'none';
+                    }
+                    renderGalaxy();
+                }
+            }
+        });
+
+        galaxyCanvas.addEventListener('mouseleave', () => {
+            hoveredPoint3D = null;
+            const tt = document.getElementById('galaxy-tooltip');
+            if (tt) tt.style.display = 'none';
+            renderGalaxy();
+        });
+
+        galaxyCanvas.addEventListener('wheel', e => {
+            e.preventDefault();
+            const delta = e.deltaY < 0 ? -25 : 25;
+            galaxyCamDist = Math.max(80, Math.min(800, galaxyCamDist + delta));
+            renderGalaxy();
+        });
+
+        galaxyCanvas.addEventListener('click', e => {
+            const rect = galaxyCanvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            let clicked = null;
+            for (let i = galaxyProjectedItems.length - 1; i >= 0; i--) {
+                const item = galaxyProjectedItems[i];
+                if (item.type === 'theorem') {
+                    const dist = Math.hypot(item.sx - mouseX, item.sy - mouseY);
+                    if (dist <= Math.max(14, item.radius + 6)) {
+                        clicked = item.pt;
+                        break;
+                    }
+                }
+            }
+            if (clicked) {
+                selectedPoint3D = clicked;
+                renderGalaxy();
+                updateAstForVectorPoint(clicked);
             }
         });
     </script>
 </body>
 </html>
-"#;
+"##;
