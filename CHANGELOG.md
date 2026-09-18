@@ -2,6 +2,28 @@
 
 All notable changes to the **Axiomatic** project will be documented in this file.
 
+## [v0.4.0] - 2026-09-18
+
+### 3D Vector Knowledge Galaxy, Interactive Equation AST Inspector, & Advanced Mathematical Domains
+
+#### 3D Vector Knowledge Galaxy (`src/memory/vectordb.rs`, `src/visualizer/server.rs`, `src/verifier/trace.rs`)
+- Added 3D power iteration PCA projection with Gram-Schmidt deflation to project high-dimensional theorem and search node embeddings into 3D coordinates.
+- Added domain categorization classifying theorems across Boolean Logic, Symbolic Calculus, Set Theory, Linear Algebra, and Abstract Algebra.
+- Added live 3D visualizer canvas with orbital mouse physics (pitch, yaw, zoom, pan), celestial bloom glow, and depth-sorted Painter's algorithm.
+- Added green glowing arcs tracing proof search trajectories in 3D.
+- Integrated 3D Vector Galaxy into standalone static HTML proof showcases with client-side PCA projection.
+
+#### Interactive Equation AST Inspector (`src/visualizer/server.rs`, `src/verifier/trace.rs`)
+- Added recursive descent AST parser for arithmetic, logical, and calculus expressions with precedence and associativity.
+- Rendered hierarchical SVG syntax tree with circular operator nodes and rounded rectangle leaf nodes.
+- Added glowing rewrite highlights illuminating modified subtrees based on applied tactic rewrites.
+- Synchronized interactive selection bidirectionally across 2D MCTS tree, 3D Vector Galaxy, and Equation AST Inspector.
+
+#### Advanced Mathematical Domains & Search Engine 2.0
+- Added curriculum domains: information theory, abstract group theory, integral transforms, category theory, topology, exterior calculus, combinatorics, and control theory.
+- Added active counterexample pruning to filter unprovable branches during MCTS expansion.
+- Extended Peano structural induction engine to support higher-order hypotheses and multi-variable recurrence.
+
 ## [v0.3.1] - 2026-09-08
 
 ### Static Proof Trace & GitHub Pages Deployment Pipeline
